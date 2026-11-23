@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hill Picker">
+<meta name="theme-color" content="#1D5B63">
+<title>Snowdonia Hill Picker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231D5B63'/%3E%3Cpath d='M4 25 12 11l5 8 3-4 8 10z' fill='%23EEF1EF'/%3E%3C/svg%3E">
+<style>
+/* Layout: one narrow column built for a phone. Day picker first, then a ranked
+   list where each hill is a row with a score gauge; tap a row for the breakdown. */
+:root {
+  --bg: #EEF1EF;
+  --surface: #FFFFFF;
+  --ink: #16201D;
+  --muted: #5B6A66;
+  --line: #D5DCD9;
+  --track: #E2E7E4;
+  --accent: #1D5B63;
+  --accent-ink: #FFFFFF;
+  --good: #2F7D4F;
+  --fair: #A8690F;
+  --poor: #B4432F;
+  --warn-bg: #F8E1DB;
+  --info-bg: #E1EEF0;
+  --font: ui-sans-serif, -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0F1614;
+    --surface: #18221F;
+    --ink: #E7EFEC;
+    --muted: #93A5A0;
+    --line: #2A3834;
+    --track: #26332F;
+    --accent: #6FC1C9;
+    --accent-ink: #0F1614;
+    --good: #58C283;
+    --fair: #E0B454;
+    --poor: #EE8A73;
+    --warn-bg: #3A1F19;
+    --info-bg: #17303A;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 var(--font);
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 640px; margin: 0 auto; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.kicker { margin: 0; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+h1 { margin: 2px 0 4px; font-size: 1.7rem; line-height: 1.15; letter-spacing: -.01em; text-wrap: balance; }
+.sub { margin: 0; color: var(--muted); font-size: .92rem; }
+.refresh { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 12px; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.refresh[disabled] { opacity: .55; cursor: default; }
+
+.days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 18px 0 14px; }
+.day { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 8px 4px 9px; text-align: center; cursor: pointer; min-width: 0; }
+.day b { display: block; font-size: .95rem; }
+.day span { display: block; font-size: .75rem; color: var(--muted); }
+.day em { display: block; font-style: normal; font-size: .72rem; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.day[aria-pressed="true"] span { color: inherit; opacity: .85; }
+
+.listhead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 8px; }
+.listhead h2 { margin: 0; font-size: 1rem; }
+.listhead small { color: var(--muted); font-size: .78rem; }
+
+ol.hills { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.hill { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.hill.good { --c: var(--good); }
+.hill.fair { --c: var(--fair); }
+.hill.poor { --c: var(--poor); }
+.hill summary { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; column-gap: 10px; row-gap: 6px; align-items: center; padding: 12px 14px 0; cursor: pointer; list-style: none; }
+.hill summary::-webkit-details-marker { display: none; }
+.rank { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.name { min-width: 0; overflow-wrap: anywhere; }
+.name b { display: block; font-size: 1.04rem; line-height: 1.2; }
+.name i { font-style: normal; color: var(--muted); font-size: .82rem; }
+.score { text-align: right; color: var(--c); }
+.score b { display: block; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.score small { display: block; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.stats { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 0 14px; color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.stats span { white-space: nowrap; }
+.chips { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: .76rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.chip.warn { background: var(--warn-bg); color: var(--poor); }
+.chip.info { background: var(--info-bg); color: var(--accent); }
+.bar { grid-column: 1 / 4; height: 6px; margin: 4px -14px 0; background: var(--track); }
+.bar span { display: block; height: 100%; background: var(--c); }
+.more { padding: 12px 14px 14px; display: grid; gap: 8px; border-top: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr) 2.2rem; gap: 10px; align-items: center; font-size: .86rem; }
+.row .t { height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; }
+.row .t span { display: block; height: 100%; background: var(--accent); }
+.row b { text-align: right; font-variant-numeric: tabular-nums; }
+.note { margin: 2px 0 0; color: var(--muted); font-size: .78rem; }
+
+.msg { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.msg.err { border-color: var(--poor); }
+.msg p { margin: 0 0 10px; }
+.msg button, .showall { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 14px; font-weight: 600; cursor: pointer; }
+.showall { width: 100%; margin-top: 10px; }
+.demo { background: var(--warn-bg); color: var(--poor); border-radius: 10px; padding: 8px 12px; font-weight: 700; font-size: .85rem; margin: 0 0 12px; }
+
+.safety { margin-top: 22px; padding: 14px 16px; border-left: 4px solid var(--poor); background: var(--surface); border-radius: 0 12px 12px 0; font-size: .88rem; }
+.safety p { margin: 0 0 6px; }
+.safety p:last-child { margin: 0; }
+footer { margin-top: 16px; color: var(--muted); font-size: .78rem; }
+footer p { margin: 0 0 4px; }
+a { color: var(--accent); }
+@media (prefers-reduced-motion: no-preference) { .bar span, .row .t span { transition: width .25s ease; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="kicker">Eryri &middot; Snowdonia</p>
+      <h1>Snowdonia Hill Picker</h1>
+      <p class="sub">Which summit suits the weather, 09:00&ndash;16:00</p>
+    </div>
+    <button class="refresh" id="refresh" type="button">Refresh</button>
+  </header>
+
+  <div class="days" id="days" role="group" aria-label="Choose a day"></div>
+  <div id="main" aria-live="polite"><div class="msg">Loading forecasts&hellip;</div></div>
+  <noscript><div class="msg err">This page needs JavaScript to load the forecast.</div></noscript>
+
+  <section class="safety" aria-label="Safety">
+    <p><b>Planning aid only, not a safety tool.</b> Scores are a rough guide built from model forecasts, and mountain weather changes fast. Always check the official mountain forecast before you set out.</p>
+    <p><a href="https://weather.metoffice.gov.uk/specialist-forecasts/mountain" target="_blank" rel="noopener">Met Office mountain forecast</a> &middot; <a href="https://mwis.org.uk" target="_blank" rel="noopener">MWIS</a></p>
+  </section>
+  <footer>
+    <p id="updated"></p>
+    <p>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), non-commercial use. Summit positions are approximate.</p>
+  </footer>
+</div>
+
+<script id="core">
+/* ---- Core logic: hills, scoring, grouping. No DOM access here. ---- */
+var HILLS = [
+  ["Yr Wyddfa (Snowdon)", 1085, 53.0685, -4.0763],
+  ["Crib Goch", 923, 53.0760, -4.0530],
+  ["Yr Aran", 747, 53.0505, -4.0390],
+  ["Moel Hebog", 783, 52.9970, -4.1050],
+  ["Moel Siabod", 872, 53.0935, -3.9335],
+  ["Cnicht", 689, 52.9795, -4.0020],
+  ["Glyder Fawr", 999, 53.1030, -4.0350],
+  ["Glyder Fach", 994, 53.1030, -4.0250],
+  ["Tryfan", 917, 53.1140, -3.9980],
+  ["Y Garn", 947, 53.1160, -4.0480],
+  ["Elidir Fawr", 924, 53.1335, -4.0820],
+  ["Pen yr Ole Wen", 978, 53.1500, -3.9970],
+  ["Carnedd Dafydd", 1044, 53.1570, -3.9840],
+  ["Carnedd Llewelyn", 1064, 53.1800, -3.9700],
+  ["Foel Grach", 976, 53.1710, -3.9720],
+  ["Foel-fras", 942, 53.2110, -3.9570],
+  ["Cadair Idris (Penygadair)", 893, 52.6997, -3.9089],
+  ["Aran Fawddwy", 905, 52.7885, -3.6880],
+  ["Arenig Fawr", 854, 52.9190, -3.7380]
+];
+var HOURLY = ["temperature_2m", "apparent_temperature", "precipitation", "precipitation_probability",
+  "cloud_cover_low", "cloud_cover_mid", "visibility", "wind_gusts_10m", "freezing_level_height"];
+var WIN_FROM = 9, WIN_TO = 16;
+
+function clean(a) { return a.filter(function (v) { return v !== null && v !== undefined && !isNaN(v); }); }
+function mean(a, d) { var c = clean(a); return c.length ? c.reduce(function (x, y) { return x + y; }, 0) / c.length : d; }
+function vmax(a, d) { var c = clean(a); return c.length ? Math.max.apply(null, c) : d; }
+function vmin(a, d) { var c = clean(a); return c.length ? Math.min.apply(null, c) : d; }
+function lerpScore(x, best, worst) {
+  if (best === worst) return 100;
+  var t = (x - worst) / (best - worst);
+  return Math.max(0, Math.min(1, t)) * 100;
+}
+
+function scoreDay(hours, summitM) {
+  var col = function (k) { return hours.map(function (h) { return h[k]; }); };
+  var low = mean(col("cloud_cover_low"), 0);
+  var mid = mean(col("cloud_cover_mid"), 0);
+  var visKm = mean(clean(col("visibility")).map(function (v) { return Math.min(v, 40000); }), 20000) / 1000;
+  var gust = vmax(col("wind_gusts_10m"), 0);
+  var pmax = vmax(col("precipitation_probability"), 0);
+  var mm = clean(col("precipitation")).reduce(function (x, y) { return x + y; }, 0);
+  var feels = vmin(col("apparent_temperature"), 5);
+  var frz = vmin(col("freezing_level_height"), 9999);
+
+  var cloudView = 100 - (0.8 * low + 0.2 * mid);
+  var view = 0.7 * cloudView + 0.3 * lerpScore(visKm, 20, 1);
+  var wind = lerpScore(gust, 20, 50);
+  var rain = Math.max(0, Math.min(100, 100 - 0.5 * pmax - Math.min(mm * 8, 50)));
+  var temp = lerpScore(feels, 5, -12);
+
+  var total = 0.30 * view + 0.30 * wind + 0.25 * rain + 0.15 * temp;
+
+  var flags = [];
+  if (gust >= 55) { total = Math.min(total, 15); flags.push("dangerous gusts"); }
+  else if (gust >= 40) { total = Math.min(total, 45); flags.push("very strong gusts - exposed ridges risky"); }
+  else if (gust >= 30) { flags.push("strong gusts"); }
+  if (mm >= 15) flags.push("heavy rain");
+  if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
+
+  return {
+    score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
+    rain: Math.round(rain), temp: Math.round(temp),
+    cloud: Math.round(low), gust: Math.round(gust), rainChance: Math.round(pmax), feels: Math.round(feels),
+    flags: flags
+  };
+}
+
+function windowByDay(hourly) {
+  var days = {};
+  hourly.time.forEach(function (t, i) {
+    var hr = parseInt(t.slice(11, 13), 10);
+    if (hr >= WIN_FROM && hr <= WIN_TO) {
+      var row = {};
+      HOURLY.forEach(function (k) { row[k] = (hourly[k] || [])[i]; });
+      var d = t.slice(0, 10);
+      (days[d] = days[d] || []).push(row);
+    }
+  });
+  return days;
+}
+
+function buildResults(seriesList, hills) {
+  hills = hills || HILLS;
+  var byDate = {};
+  hills.forEach(function (h, idx) {
+    var dd = windowByDay(seriesList[idx]);
+    Object.keys(dd).forEach(function (date) {
+      var s = scoreDay(dd[date], h[1]);
+      s.name = h[0]; s.metres = h[1];
+      (byDate[date] = byDate[date] || []).push(s);
+    });
+  });
+  return Object.keys(byDate).sort().map(function (date) {
+    return { date: date, hills: byDate[date].sort(function (a, b) { return b.score - a.score; }) };
+  });
+}
+
+/* ---- Fake data for the #demo preview only ---- */
+function pad(n) { return String(n).padStart(2, "0"); }
+function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function rngFor(str) {
+  var h = 1779033703 ^ str.length;
+  for (var i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  var a = h >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function demoSeries(hill, days) {
+  var rng = rngFor(hill[0]);
+  var u = function (a, b) { return a + (b - a) * rng(); };
+  var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
+  var now = new Date();
+  var out = { time: [] };
+  HOURLY.forEach(function (k) { out[k] = []; });
+  for (var d = 0; d < days; d++) {
+    var dr = rngFor("day" + d);
+    var cloud = 10 + 80 * dr(), wind = 8 + 27 * dr(), rain = 80 * dr(), temp = -3 + 15 * dr();
+    var alt = (hill[1] - 700) / 25;
+    var date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
+    for (var h = 0; h < 24; h++) {
+      out.time.push(ymd(date) + "T" + pad(h) + ":00");
+      out.temperature_2m.push(temp - alt / 6 + u(-1, 1));
+      out.apparent_temperature.push(temp - alt / 3 - wind / 8 + u(-1, 1));
+      out.precipitation.push(Math.max(0, rain / 80 * u(0, 1.5)));
+      out.precipitation_probability.push(clamp(rain + u(-10, 10), 0, 100));
+      out.cloud_cover_low.push(clamp(cloud + alt + u(-15, 15), 0, 100));
+      out.cloud_cover_mid.push(clamp(cloud * 0.7 + u(-15, 15), 0, 100));
+      out.visibility.push(Math.max(500, 30000 - cloud * 250 - rain * 100 + u(-3000, 3000)));
+      out.wind_gusts_10m.push(Math.max(0, wind * 1.25 + alt / 2 + u(-4, 4)));
+      out.freezing_level_height.push(1400 - (10 - temp) * 120 + u(-50, 50));
+    }
+  }
+  return out;
+}
+
+if (typeof module !== "undefined") {
+  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
+}
+</script>
+
+<script id="ui">
+(function () {
+  var API = "https://api.open-meteo.com/v1/forecast";
+  var CACHE_KEY = "shp-snowdonia-v1", CACHE_MIN = 60, DAYS = 4, TOP = 10;
+  var $ = function (s) { return document.querySelector(s); };
+  var data = null, sel = 0, showAll = false, failed = null;
+  var demo = location.hash === "#demo";
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function grade(n) { return n >= 70 ? ["good", "Good"] : n >= 45 ? ["fair", "Fair"] : ["poor", "Poor"]; }
+  function fmt(date, opts) { return new Date(date + "T12:00:00").toLocaleDateString("en-GB", opts); }
+
+  function readCache() {
+    try {
+      var o = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+      if (o && !o.demo && Date.now() - o.fetchedAt < CACHE_MIN * 60000) return o;
+    } catch (e) {}
+    return null;
+  }
+  function writeCache(o) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(o)); } catch (e) {} }
+
+  function fetchForecast() {
+    var p = new URLSearchParams({
+      latitude: HILLS.map(function (h) { return h[2].toFixed(4); }).join(","),
+      longitude: HILLS.map(function (h) { return h[3].toFixed(4); }).join(","),
+      elevation: HILLS.map(function (h) { return Math.round(h[1]); }).join(","),
+      hourly: HOURLY.join(","),
+      wind_speed_unit: "mph",
+      timezone: "Europe/London",
+      forecast_days: String(DAYS)
+    });
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, 20000);
+    return fetch(API + "?" + p.toString(), { signal: ctl.signal, cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("The forecast service returned " + r.status + "."); return r.json(); })
+      .then(function (j) { return (Array.isArray(j) ? j : [j]).map(function (r) { return r.hourly; }); })
+      .finally(function () { clearTimeout(timer); });
+  }
+
+  function load(force) {
+    failed = null;
+    if (demo) {
+      data = { fetchedAt: Date.now(), demo: true, days: buildResults(HILLS.map(function (h) { return demoSeries(h, DAYS); })) };
+      return render();
+    }
+    if (!force) {
+      var c = readCache();
+      if (c) { data = c; return render(); }
+    }
+    $("#refresh").disabled = true;
+    $("#main").innerHTML = '<div class="msg">Loading forecasts&hellip;</div>';
+    fetchForecast().then(function (series) {
+      data = { fetchedAt: Date.now(), demo: false, days: buildResults(series) };
+      writeCache(data);
+    }).catch(function (e) {
+      failed = (e && e.name === "AbortError") ? "The forecast service took too long to answer." : (e && e.message && e.message.indexOf("service returned") > -1 ? e.message : "Couldn't reach the forecast service. Check your connection.");
+    }).then(function () { $("#refresh").disabled = false; render(); });
+  }
+
+  function hillHtml(h, i) {
+    var g = grade(h.score);
+    var chips = h.flags.map(function (f) {
+      var kind = f.indexOf("freezing") === 0 ? "info" : "warn";
+      return '<span class="chip ' + kind + '">' + esc(cap(f)) + "</span>";
+    }).join("");
+    var rows = [["Views", h.view], ["Wind", h.wind], ["Rain", h.rain], ["Cold", h.temp]].map(function (r) {
+      return '<div class="row"><span>' + r[0] + '</span><span class="t"><span style="width:' + r[1] + '%"></span></span><b>' + r[1] + "</b></div>";
+    }).join("");
+    return '<li><details class="hill ' + g[0] + '"><summary>' +
+      '<span class="rank">' + (i + 1) + "</span>" +
+      '<span class="name"><b>' + esc(h.name) + "</b><i>" + h.metres + " m</i></span>" +
+      '<span class="score"><b>' + h.score + "</b><small>" + g[1] + "</small></span>" +
+      '<span class="stats"><span>Cloud ' + h.cloud + "%</span><span>Gusts " + h.gust + " mph</span><span>Rain " + h.rainChance + "%</span><span>Feels " + h.feels + "&deg;C</span></span>" +
+      (chips ? '<span class="chips">' + chips + "</span>" : "") +
+      '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
+      '</summary><div class="more">' + rows +
+      '<p class="note">Score = 30% views, 30% wind, 25% rain, 15% cold. Gusts of 40 mph or more cap it.</p></div></details></li>';
+  }
+
+  function render() {
+    var main = $("#main"), daysEl = $("#days");
+    if (failed || !data) {
+      daysEl.innerHTML = "";
+      main.innerHTML = '<div class="msg err"><p>' + esc(failed || "No forecast loaded.") + '</p><button type="button" id="retry">Try again</button></div>';
+      $("#updated").textContent = "";
+      return;
+    }
+    if (sel >= data.days.length) sel = 0;
+    daysEl.innerHTML = data.days.map(function (d, i) {
+      var top = d.hills.length ? d.hills[0].score : 0;
+      var label = i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmt(d.date, { weekday: "short" });
+      return '<button class="day" type="button" data-i="' + i + '" aria-pressed="' + (i === sel) + '"><b>' + label + "</b><span>" +
+        fmt(d.date, { day: "numeric", month: "short" }) + "</span><em>Best " + top + "</em></button>";
+    }).join("");
+    var day = data.days[sel];
+    var list = showAll ? day.hills : day.hills.slice(0, TOP);
+    main.innerHTML =
+      (data.demo ? '<p class="demo">DEMO DATA: invented numbers, not real weather.</p>' : "") +
+      '<div class="listhead"><h2>' + fmt(day.date, { weekday: "long", day: "numeric", month: "short" }) + "</h2><small>Tap a hill for detail</small></div>" +
+      '<ol class="hills">' + list.map(hillHtml).join("") + "</ol>" +
+      (day.hills.length > TOP ? '<button class="showall" type="button" id="showall">' + (showAll ? "Show top " + TOP : "Show all " + day.hills.length + " hills") + "</button>" : "");
+    var t = new Date(data.fetchedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    $("#updated").textContent = (data.demo ? "Demo data generated " : "Forecast updated ") + t + ".";
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("button") : null;
+    if (!b) return;
+    if (b.classList.contains("day")) { sel = +b.getAttribute("data-i"); showAll = false; render(); }
+    else if (b.id === "showall") { showAll = !showAll; render(); }
+    else if (b.id === "retry") { load(true); }
+    else if (b.id === "refresh") { load(true); }
+  });
+  window.addEventListener("hashchange", function () { location.reload(); });
+  load(false);
+})();
+</script>
+</body>
+</html>
