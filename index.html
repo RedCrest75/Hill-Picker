@@ -203,9 +203,8 @@ function scoreDay(hours, summitM) {
   var wind = lerpScore(gust, 20, 50);
   var chanceWeight = 0.4 + 0.6 * Math.min(1, mm / 2); // chance counts 40% with no rain forecast, fully from 2 mm
   var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg * chanceWeight - Math.min(mm * 8, 50)));
-  var temp = lerpScore(feels, 5, -12);
 
-  var total = 0.30 * view + 0.30 * wind + 0.30 * rain + 0.10 * temp;
+  var total = 0.35 * view + 0.35 * wind + 0.30 * rain;
 
   var flags = [];
   if (gust >= 55) { total = Math.min(total, 15); flags.push("dangerous gusts"); }
@@ -217,7 +216,7 @@ function scoreDay(hours, summitM) {
 
   return {
     score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
-    rain: Math.round(rain), temp: Math.round(temp),
+    rain: Math.round(rain),
     cloud: Math.round(low), gust: Math.round(gust), rainChance: Math.round(pavg), rainMm: Math.round(mm * 10) / 10, feels: Math.round(feels),
     flags: flags
   };
@@ -311,7 +310,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_KEY = "shp-snowdonia-v5", CACHE_MIN = 60, DAYS = 4, TOP = 10;
+  var CACHE_KEY = "shp-snowdonia-v6", CACHE_MIN = 60, DAYS = 4, TOP = 10;
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null;
   var demo = location.hash === "#demo";
@@ -374,7 +373,7 @@ if (typeof module !== "undefined") {
       var kind = (f.indexOf("freezing") === 0 || f.indexOf("murky") === 0) ? "info" : "warn";
       return '<span class="chip ' + kind + '">' + esc(cap(f)) + "</span>";
     }).join("");
-    var rows = [["Views", h.view], ["Calm", h.wind], ["Dryness", h.rain], ["Warmth", h.temp]].map(function (r) {
+    var rows = [["Views", h.view], ["Calm", h.wind], ["Dryness", h.rain]].map(function (r) {
       return '<div class="row"><span>' + r[0] + '</span><span class="t"><span style="width:' + r[1] + '%"></span></span><b>' + r[1] + "</b></div>";
     }).join("");
     return '<li><details class="hill ' + g[0] + '"><summary>' +
@@ -385,7 +384,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Longer bars are better. Score = 30% views, 30% calm, 30% dryness, 10% warmth. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Gusts of 40 mph or more cap the score.</p></div></details></li>';
+      '<p class="note">Longer bars are better. Score = 35% views, 35% calm, 30% dryness. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Gusts of 40 mph or more cap the score.</p></div></details></li>';
   }
 
   function render() {
