@@ -223,6 +223,14 @@ function scoreDay(hours, summitM) {
   };
 }
 
+/* Plain-English rain wording for the card. Under 0.5 mm in the window, a high chance
+   means damp air and hill cloud rather than rain. */
+function rainText(chance, mm) {
+  if (mm >= 0.5) return "Rain " + chance + "%, " + mm.toFixed(1) + " mm";
+  if (chance >= 50) return mm < 0.1 ? "Damp, no rain forecast" : "Damp, " + mm.toFixed(1) + " mm";
+  return mm < 0.1 ? "Dry" : "Mostly dry, " + mm.toFixed(1) + " mm";
+}
+
 function windowByDay(hourly) {
   var days = {};
   hourly.time.forEach(function (t, i) {
@@ -296,7 +304,7 @@ function demoSeries(hill, days) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
+  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, rainText: rainText, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
 }
 </script>
 
@@ -373,7 +381,7 @@ if (typeof module !== "undefined") {
       '<span class="rank">' + (i + 1) + "</span>" +
       '<span class="name"><b>' + esc(h.name) + "</b><i>" + h.metres + " m</i></span>" +
       '<span class="score"><b>' + h.score + "</b><small>" + g[1] + "</small></span>" +
-      '<span class="stats"><span>Cloud ' + h.cloud + "%</span><span>Gusts " + h.gust + " mph</span><span>Rain " + h.rainChance + "%, " + h.rainMm.toFixed(1) + " mm</span><span>Feels " + h.feels + "&deg;C</span></span>" +
+      '<span class="stats"><span>Cloud ' + h.cloud + "%</span><span>Gusts " + h.gust + " mph</span><span>" + esc(rainText(h.rainChance, h.rainMm)) + "</span><span>Feels " + h.feels + "&deg;C</span></span>" +
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
