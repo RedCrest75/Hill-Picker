@@ -201,7 +201,8 @@ function scoreDay(hours, summitM) {
   var cloudView = 100 - (0.8 * low + 0.2 * mid);
   var view = 0.7 * cloudView + 0.3 * lerpScore(visKm, 20, 1);
   var wind = lerpScore(gust, 20, 50);
-  var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg - Math.min(mm * 8, 50)));
+  var chanceWeight = 0.4 + 0.6 * Math.min(1, mm / 2); // chance counts 40% with no rain forecast, fully from 2 mm
+  var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg * chanceWeight - Math.min(mm * 8, 50)));
   var temp = lerpScore(feels, 5, -12);
 
   var total = 0.30 * view + 0.30 * wind + 0.30 * rain + 0.10 * temp;
@@ -212,6 +213,7 @@ function scoreDay(hours, summitM) {
   else if (gust >= 30) { flags.push("strong gusts"); }
   if (mm >= 15) flags.push("heavy rain");
   if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
+  if (low >= 90) flags.push("murky and damp - tops likely in cloud");
 
   return {
     score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
@@ -301,7 +303,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_KEY = "shp-snowdonia-v3", CACHE_MIN = 60, DAYS = 4, TOP = 10;
+  var CACHE_KEY = "shp-snowdonia-v5", CACHE_MIN = 60, DAYS = 4, TOP = 10;
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null;
   var demo = location.hash === "#demo";
@@ -361,7 +363,7 @@ if (typeof module !== "undefined") {
   function hillHtml(h, i) {
     var g = grade(h.score);
     var chips = h.flags.map(function (f) {
-      var kind = f.indexOf("freezing") === 0 ? "info" : "warn";
+      var kind = (f.indexOf("freezing") === 0 || f.indexOf("murky") === 0) ? "info" : "warn";
       return '<span class="chip ' + kind + '">' + esc(cap(f)) + "</span>";
     }).join("");
     var rows = [["Views", h.view], ["Wind", h.wind], ["Rain", h.rain], ["Cold", h.temp]].map(function (r) {
@@ -375,7 +377,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Score = 30% views, 30% wind, 30% rain, 10% cold. Rain counts the average chance and the total rainfall, 09:00&ndash;16:00. Gusts of 40 mph or more cap the score.</p></div></details></li>';
+      '<p class="note">Score = 30% views, 30% wind, 30% rain, 10% cold. Rain counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Gusts of 40 mph or more cap the score.</p></div></details></li>';
   }
 
   function render() {
