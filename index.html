@@ -374,7 +374,7 @@ if (typeof module !== "undefined") {
       var kind = (f.indexOf("freezing") === 0 || f.indexOf("murky") === 0) ? "info" : "warn";
       return '<span class="chip ' + kind + '">' + esc(cap(f)) + "</span>";
     }).join("");
-    var rows = [["Views", h.view], ["Wind", h.wind], ["Rain", h.rain], ["Cold", h.temp]].map(function (r) {
+    var rows = [["Views", h.view], ["Calm", h.wind], ["Dryness", h.rain], ["Warmth", h.temp]].map(function (r) {
       return '<div class="row"><span>' + r[0] + '</span><span class="t"><span style="width:' + r[1] + '%"></span></span><b>' + r[1] + "</b></div>";
     }).join("");
     return '<li><details class="hill ' + g[0] + '"><summary>' +
@@ -385,7 +385,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Score = 30% views, 30% wind, 30% rain, 10% cold. Rain counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Gusts of 40 mph or more cap the score.</p></div></details></li>';
+      '<p class="note">Longer bars are better. Score = 30% views, 30% calm, 30% dryness, 10% warmth. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Gusts of 40 mph or more cap the score.</p></div></details></li>';
   }
 
   function render() {
