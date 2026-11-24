@@ -25,6 +25,9 @@
   --poor: #B4432F;
   --warn-bg: #F8E1DB;
   --info-bg: #E1EEF0;
+  --sun: #E3A52F;
+  --cloud: #B7C4C0;
+  --cloud-dark: #7F918C;
   --font: ui-sans-serif, -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
   color-scheme: light;
 }
@@ -43,6 +46,9 @@
     --poor: #EE8A73;
     --warn-bg: #3A1F19;
     --info-bg: #17303A;
+    --sun: #F2C65C;
+    --cloud: #5E716C;
+    --cloud-dark: #8BA09A;
     color-scheme: dark;
   }
 }
@@ -85,7 +91,7 @@ ol.hills { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .hill.good { --c: var(--good); }
 .hill.fair { --c: var(--fair); }
 .hill.poor { --c: var(--poor); }
-.hill summary { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; column-gap: 10px; row-gap: 6px; align-items: center; padding: 12px 14px 0; cursor: pointer; list-style: none; }
+.hill summary { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto auto; column-gap: 10px; row-gap: 6px; align-items: center; padding: 12px 14px 0; cursor: pointer; list-style: none; }
 .hill summary::-webkit-details-marker { display: none; }
 .rank { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
 .name { min-width: 0; overflow-wrap: anywhere; }
@@ -94,13 +100,22 @@ ol.hills { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .score { text-align: right; color: var(--c); }
 .score b { display: block; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .score small { display: block; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.stats { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 0 14px; color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.wx { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); display: grid; place-items: center; }
+.wx svg { width: 36px; height: 36px; display: block; }
+.wx .s { fill: var(--sun); }
+.wx .c { fill: var(--cloud); }
+.wx .cd { fill: var(--cloud-dark); }
+.wx .sr, .wx .m, .wx .d, .wx .w { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.wx .sr { stroke: var(--sun); }
+.wx .m { stroke: var(--cloud-dark); }
+.wx .d, .wx .w { stroke: var(--accent); }
+.stats { grid-column: 2 / 5; display: flex; flex-wrap: wrap; gap: 0 14px; color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
 .stats span { white-space: nowrap; }
-.chips { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 6px; }
+.chips { grid-column: 2 / 5; display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font-size: .76rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
 .chip.warn { background: var(--warn-bg); color: var(--poor); }
 .chip.info { background: var(--info-bg); color: var(--accent); }
-.bar { grid-column: 1 / 4; height: 6px; margin: 4px -14px 0; background: var(--track); }
+.bar { grid-column: 1 / 5; height: 6px; margin: 4px -14px 0; background: var(--track); }
 .bar span { display: block; height: 100%; background: var(--c); }
 .more { padding: 12px 14px 14px; display: grid; gap: 8px; border-top: 1px solid var(--line); }
 .row { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr) 2.2rem; gap: 10px; align-items: center; font-size: .86rem; }
@@ -222,6 +237,31 @@ function scoreDay(hours, summitM) {
   };
 }
 
+/* Picture for each card: one simple weather symbol summing up the day. Drawn as inline
+   SVG so there are no image files to host. Order matters: the most important wins. */
+var CLOUD = function (cls, dy) {
+  return '<g class="' + cls + '" transform="translate(0 ' + dy + ')"><circle cx="13" cy="26" r="6"/><circle cx="21" cy="21.5" r="8"/><circle cx="29" cy="26" r="5.5"/><rect x="13" y="26" width="16" height="6"/></g>';
+};
+var SUN = '<circle class="s" cx="20" cy="20" r="7"/><path class="sr" d="M31 20h4M27.8 12.2l2.8-2.8M20 9V5M12.2 12.2 9.4 9.4M9 20H5M12.2 27.8l-2.8 2.8M20 31v4M27.8 27.8l2.8 2.8"/>';
+var WX = {
+  clear: { label: "Clear", svg: SUN },
+  partly: { label: "Cloud and sun", svg: '<g transform="translate(3 -1) scale(.62)">' + SUN + "</g>" + CLOUD("c", 2) },
+  murky: { label: "Murky and damp", svg: CLOUD("c", -5) + '<path class="m" d="M8 30h24M11 34h22M8 38h16"/>' },
+  rain: { label: "Rain", svg: CLOUD("cd", -5) + '<path class="d" d="M13 30l-2 5M21 30l-2 5M29 30l-2 5"/>' },
+  windy: { label: "Very windy", svg: '<path class="w" d="M5 14h17a4 4 0 1 0-4-4M5 21h24a4 4 0 1 1-4 4M5 28h12a3.5 3.5 0 1 1-3.5 3.5"/>' }
+};
+function weatherKind(h) {
+  if (h.gust >= 40) return "windy";
+  if (h.rainMm >= 0.5) return "rain";
+  if (h.cloud >= 90) return "murky";
+  if (h.cloud >= 50) return "partly";
+  return "clear";
+}
+function wxHtml(h) {
+  var w = WX[weatherKind(h)];
+  return '<span class="wx" role="img" aria-label="' + w.label + '" title="' + w.label + '"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">' + w.svg + "</svg></span>";
+}
+
 /* Plain-English rain wording for the card. Under 0.5 mm in the window, a high chance
    means damp air and hill cloud rather than rain. */
 function rainText(chance, mm) {
@@ -303,7 +343,7 @@ function demoSeries(hill, days) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, rainText: rainText, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
+  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
 }
 </script>
 
@@ -379,7 +419,7 @@ if (typeof module !== "undefined") {
     return '<li><details class="hill ' + g[0] + '"><summary>' +
       '<span class="rank">' + (i + 1) + "</span>" +
       '<span class="name"><b>' + esc(h.name) + "</b><i>" + h.metres + " m</i></span>" +
-      '<span class="score"><b>' + h.score + "</b><small>" + g[1] + "</small></span>" +
+      wxHtml(h) + '<span class="score"><b>' + h.score + "</b><small>" + g[1] + "</small></span>" +
       '<span class="stats"><span>Cloud ' + h.cloud + "%</span><span>Gusts " + h.gust + " mph</span><span>" + esc(rainText(h.rainChance, h.rainMm)) + "</span><span>Feels " + h.feels + "&deg;C</span></span>" +
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
