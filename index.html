@@ -204,7 +204,7 @@ function scoreDay(hours, summitM) {
   var rain = Math.max(0, Math.min(100, 100 - 0.5 * pmax - Math.min(mm * 8, 50)));
   var temp = lerpScore(feels, 5, -12);
 
-  var total = 0.30 * view + 0.30 * wind + 0.25 * rain + 0.15 * temp;
+  var total = 0.30 * view + 0.30 * wind + 0.30 * rain + 0.10 * temp;
 
   var flags = [];
   if (gust >= 55) { total = Math.min(total, 15); flags.push("dangerous gusts"); }
@@ -301,7 +301,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_KEY = "shp-snowdonia-v1", CACHE_MIN = 60, DAYS = 4, TOP = 10;
+  var CACHE_KEY = "shp-snowdonia-v2", CACHE_MIN = 60, DAYS = 4, TOP = 10;
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null;
   var demo = location.hash === "#demo";
@@ -375,7 +375,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Score = 30% views, 30% wind, 25% rain, 15% cold. Gusts of 40 mph or more cap it.</p></div></details></li>';
+      '<p class="note">Score = 30% views, 30% wind, 30% rain, 10% cold. Gusts of 40 mph or more cap it.</p></div></details></li>';
   }
 
   function render() {
