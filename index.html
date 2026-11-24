@@ -193,7 +193,7 @@ function scoreDay(hours, summitM) {
   var mid = mean(col("cloud_cover_mid"), 0);
   var visKm = mean(clean(col("visibility")).map(function (v) { return Math.min(v, 40000); }), 20000) / 1000;
   var gust = vmax(col("wind_gusts_10m"), 0);
-  var pmax = vmax(col("precipitation_probability"), 0);
+  var pavg = mean(col("precipitation_probability"), 0);
   var mm = clean(col("precipitation")).reduce(function (x, y) { return x + y; }, 0);
   var feels = vmin(col("apparent_temperature"), 5);
   var frz = vmin(col("freezing_level_height"), 9999);
@@ -201,7 +201,7 @@ function scoreDay(hours, summitM) {
   var cloudView = 100 - (0.8 * low + 0.2 * mid);
   var view = 0.7 * cloudView + 0.3 * lerpScore(visKm, 20, 1);
   var wind = lerpScore(gust, 20, 50);
-  var rain = Math.max(0, Math.min(100, 100 - 0.5 * pmax - Math.min(mm * 8, 50)));
+  var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg - Math.min(mm * 8, 50)));
   var temp = lerpScore(feels, 5, -12);
 
   var total = 0.30 * view + 0.30 * wind + 0.30 * rain + 0.10 * temp;
@@ -216,7 +216,7 @@ function scoreDay(hours, summitM) {
   return {
     score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
     rain: Math.round(rain), temp: Math.round(temp),
-    cloud: Math.round(low), gust: Math.round(gust), rainChance: Math.round(pmax), feels: Math.round(feels),
+    cloud: Math.round(low), gust: Math.round(gust), rainChance: Math.round(pavg), rainMm: Math.round(mm * 10) / 10, feels: Math.round(feels),
     flags: flags
   };
 }
@@ -301,7 +301,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_KEY = "shp-snowdonia-v2", CACHE_MIN = 60, DAYS = 4, TOP = 10;
+  var CACHE_KEY = "shp-snowdonia-v3", CACHE_MIN = 60, DAYS = 4, TOP = 10;
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null;
   var demo = location.hash === "#demo";
@@ -371,11 +371,11 @@ if (typeof module !== "undefined") {
       '<span class="rank">' + (i + 1) + "</span>" +
       '<span class="name"><b>' + esc(h.name) + "</b><i>" + h.metres + " m</i></span>" +
       '<span class="score"><b>' + h.score + "</b><small>" + g[1] + "</small></span>" +
-      '<span class="stats"><span>Cloud ' + h.cloud + "%</span><span>Gusts " + h.gust + " mph</span><span>Rain " + h.rainChance + "%</span><span>Feels " + h.feels + "&deg;C</span></span>" +
+      '<span class="stats"><span>Cloud ' + h.cloud + "%</span><span>Gusts " + h.gust + " mph</span><span>Rain " + h.rainChance + "%, " + h.rainMm.toFixed(1) + " mm</span><span>Feels " + h.feels + "&deg;C</span></span>" +
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Score = 30% views, 30% wind, 30% rain, 10% cold. Gusts of 40 mph or more cap it.</p></div></details></li>';
+      '<p class="note">Score = 30% views, 30% wind, 30% rain, 10% cold. Rain counts the average chance and the total rainfall, 09:00&ndash;16:00. Gusts of 40 mph or more cap the score.</p></div></details></li>';
   }
 
   function render() {
