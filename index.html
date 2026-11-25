@@ -71,6 +71,8 @@ button { font: inherit; color: inherit; }
 .kicker { margin: 0; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 h1 { margin: 2px 0 4px; font-size: 1.7rem; line-height: 1.15; letter-spacing: -.01em; text-wrap: balance; }
 .sub { margin: 0; color: var(--muted); font-size: .92rem; }
+.rankline { margin: -2px 0 12px; color: var(--muted); font-size: .84rem; }
+.rankline b { color: var(--ink); }
 .refresh { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 12px; font-size: .85rem; font-weight: 600; cursor: pointer; }
 .refresh[disabled] { opacity: .55; cursor: default; }
 
@@ -156,6 +158,7 @@ a { color: var(--accent); }
 
   <div class="picker"><label for="area">Area</label><select id="area"></select></div>
   <div class="days" id="days" role="group" aria-label="Choose a day"></div>
+  <p class="rankline"><b>Ranked best to worst</b> for the day you pick: #1 is the best bet.</p>
   <div id="main" aria-live="polite"><div class="msg">Loading forecasts&hellip;</div></div>
   <noscript><div class="msg err">This page needs JavaScript to load the forecast.</div></noscript>
 
