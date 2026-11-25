@@ -172,7 +172,7 @@ a { color: var(--accent); }
 <script id="core">
 /* ---- Core logic: hills, scoring, grouping. No DOM access here. ---- */
 var REGIONS = [
-  { id: "snowdonia", name: "Snowdonia (Eryri)", country: "Wales", tier: "mountain", hills: [
+  { id: "snowdonia", name: "Snowdonia (Eryri)", country: "Wales", tier: "mountain", park: true, kicker: "Wales · National Park", hills: [
     ["Yr Wyddfa (Snowdon)", 1085, 53.0685, -4.0763],
     ["Crib Goch", 923, 53.0760, -4.0530],
     ["Yr Aran", 747, 53.0505, -4.0390],
@@ -193,7 +193,7 @@ var REGIONS = [
     ["Aran Fawddwy", 905, 52.7885, -3.6880],
     ["Arenig Fawr", 854, 52.9190, -3.7380]
   ] },
-  { id: "brecon-beacons", name: "Brecon Beacons (Bannau Brycheiniog)", country: "Wales", tier: "mountain", hills: [
+  { id: "brecon-beacons", name: "Brecon Beacons (Bannau Brycheiniog)", country: "Wales", tier: "mountain", park: true, kicker: "Wales · National Park", hills: [
     ["Pen y Fan", 886, 51.8842, -3.4369],
     ["Corn Du", 873, 51.8814, -3.4440],
     ["Cribyn", 795, 51.8789, -3.4236],
@@ -204,13 +204,13 @@ var REGIONS = [
     ["Sugar Loaf", 596, 51.8570, -3.0570],
     ["Blorenge", 561, 51.7970, -3.0630]
   ] },
-  { id: "pembrokeshire", name: "Pembrokeshire Coast", country: "Wales", tier: "general", hills: [
+  { id: "pembrokeshire", name: "Pembrokeshire Coast", country: "Wales", tier: "general", park: true, kicker: "Wales · National Park", hills: [
     ["Carn Ingli", 347, 52.0000, -4.8500],
     ["Carn Llidi", 181, 51.9000, -5.3100],
     ["Strumble Head", 40, 52.0310, -5.0680],
     ["Stackpole Head", 40, 51.6000, -4.9200]
   ] },
-  { id: "lake-district", name: "Lake District", country: "England", tier: "mountain", hills: [
+  { id: "lake-district", name: "Lake District", country: "England", tier: "mountain", park: true, kicker: "England · National Park", hills: [
     ["Scafell Pike", 978, 54.4541, -3.2123],
     ["Helvellyn", 950, 54.5269, -3.0182],
     ["Skiddaw", 931, 54.6506, -3.1484],
@@ -226,7 +226,7 @@ var REGIONS = [
     ["Haystacks", 597, 54.5068, -3.2478],
     ["Catbells", 451, 54.5677, -3.1708]
   ] },
-  { id: "peak-district", name: "Peak District", country: "England", tier: "mountain", hills: [
+  { id: "peak-district", name: "Peak District", country: "England", tier: "mountain", park: true, kicker: "England · National Park", hills: [
     ["Kinder Scout", 636, 53.3843, -1.8737],
     ["Bleaklow", 633, 53.4616, -1.8629],
     ["Black Hill", 582, 53.5407, -1.8853],
@@ -239,7 +239,7 @@ var REGIONS = [
     ["Stanage Edge (High Neb)", 458, 53.3623, -1.6589],
     ["Chrome Hill", 425, 53.2027, -1.8967]
   ] },
-  { id: "yorkshire-dales", name: "Yorkshire Dales", country: "England", tier: "mountain", hills: [
+  { id: "yorkshire-dales", name: "Yorkshire Dales", country: "England", tier: "mountain", park: true, kicker: "England · National Park", hills: [
     ["Whernside", 736, 54.2276, -2.4034],
     ["Ingleborough", 723, 54.1665, -2.3982],
     ["Great Shunner Fell", 716, 54.3710, -2.2339],
@@ -249,20 +249,20 @@ var REGIONS = [
     ["Pen-y-ghent", 694, 54.1562, -2.2496],
     ["Simon's Seat", 485, 54.0341, -1.8809]
   ] },
-  { id: "north-york-moors", name: "North York Moors", country: "England", tier: "general", hills: [
+  { id: "north-york-moors", name: "North York Moors", country: "England", tier: "general", park: true, kicker: "England · National Park", hills: [
     ["Round Hill (Urra Moor)", 454, 54.4055, -1.0803],
     ["Cringle Moor", 433, 54.4196, -1.1770],
     ["Roseberry Topping", 320, 54.5054, -1.1074],
     ["Sutton Bank", 297, 54.2401, -1.2113]
   ] },
-  { id: "northumberland", name: "Northumberland", country: "England", tier: "general", hills: [
+  { id: "northumberland", name: "Northumberland", country: "England", tier: "general", park: true, kicker: "England · National Park", hills: [
     ["The Cheviot", 815, 55.4782, -2.1455],
     ["Hedgehope Hill", 714, 55.4711, -2.0901],
     ["Windy Gyle", 619, 55.4305, -2.2307],
     ["Simonside", 430, 55.2833, -1.9464],
     ["Housesteads Crags", 300, 55.0133, -2.3299]
   ] },
-  { id: "dartmoor", name: "Dartmoor", country: "England", tier: "general", hills: [
+  { id: "dartmoor", name: "Dartmoor", country: "England", tier: "general", park: true, kicker: "England · National Park", hills: [
     ["High Willhays", 621, 50.6860, -4.0115],
     ["Yes Tor", 619, 50.6923, -4.0104],
     ["Cosdon Beacon", 550, 50.7089, -3.9303],
@@ -272,19 +272,19 @@ var REGIONS = [
     ["Hound Tor", 414, 50.5953, -3.7787],
     ["Brent Tor", 330, 50.6033, -4.1606]
   ] },
-  { id: "exmoor", name: "Exmoor", country: "England", tier: "general", hills: [
+  { id: "exmoor", name: "Exmoor", country: "England", tier: "general", park: true, kicker: "England · National Park", hills: [
     ["Dunkery Beacon", 519, 51.1620, -3.5874],
     ["Selworthy Beacon", 308, 51.2182, -3.5506],
     ["Great Hangman", 318, 51.2130, -4.0300],
     ["Foreland Point", 200, 51.2330, -3.7900]
   ] },
-  { id: "new-forest", name: "New Forest", country: "England", tier: "general", hills: [
+  { id: "new-forest", name: "New Forest", country: "England", tier: "general", park: true, kicker: "England · National Park", hills: [
     ["Fritham", 60, 50.9350, -1.6250],
     ["Lyndhurst", 30, 50.8710, -1.5920],
     ["Brockenhurst", 15, 50.8190, -1.5740],
     ["Burley", 40, 50.8330, -1.7020]
   ] },
-  { id: "south-downs", name: "South Downs", country: "England", tier: "general", hills: [
+  { id: "south-downs", name: "South Downs", country: "England", tier: "general", park: true, kicker: "England · National Park", hills: [
     ["Black Down", 280, 51.0000, -0.6900],
     ["Butser Hill", 271, 50.9776, -0.9758],
     ["Ditchling Beacon", 248, 50.9011, -0.1071],
@@ -293,13 +293,13 @@ var REGIONS = [
     ["Firle Beacon", 217, 50.8336, 0.1074],
     ["Beachy Head", 162, 50.7364, 0.2561]
   ] },
-  { id: "broads", name: "The Broads", country: "England", tier: "general", hills: [
+  { id: "broads", name: "The Broads", country: "England", tier: "general", park: true, kicker: "England · National Park", hills: [
     ["Hickling Broad", 2, 52.7000, 1.5800],
     ["Barton Broad", 2, 52.7300, 1.5000],
     ["Wroxham", 5, 52.7130, 1.4000],
     ["Reedham", 3, 52.5620, 1.5650]
   ] },
-  { id: "cairngorms", name: "Cairngorms", country: "Scotland", tier: "scotland", hills: [
+  { id: "cairngorms", name: "Cairngorms", country: "Scotland", tier: "scotland", park: true, kicker: "Scotland · National Park", hills: [
     ["Ben Macdui", 1309, 57.0700, -3.6691],
     ["Braeriach", 1296, 57.0782, -3.7288],
     ["Cairn Toul", 1291, 57.0542, -3.7112],
@@ -310,7 +310,114 @@ var REGIONS = [
     ["Bynack More", 1090, 57.1376, -3.5845],
     ["Meall a' Bhuachaille", 810, 57.1841, -3.6726]
   ] },
-  { id: "loch-lomond", name: "Loch Lomond & The Trossachs", country: "Scotland", tier: "scotland", hills: [
+  { id: "lochaber", name: "Ben Nevis & Glen Coe", country: "Scotland", tier: "scotland", park: false, kicker: "Scotland · Highlands", hills: [
+    ["Ben Nevis", 1345, 56.7961, -5.0047],
+    ["Aonach Beag", 1234, 56.7991, -4.9558],
+    ["Aonach Mor", 1221, 56.8124, -4.9618],
+    ["Carn Mor Dearg", 1220, 56.8046, -4.9874],
+    ["Bidean nam Bian", 1150, 56.6427, -5.0300],
+    ["Sgurr a' Mhaim", 1099, 56.7557, -5.0031],
+    ["Buachaille Etive Mor", 1022, 56.6466, -4.9014],
+    ["Meall Dearg (Aonach Eagach)", 953, 56.6791, -5.0085]
+  ] },
+  { id: "skye", name: "Isle of Skye", country: "Scotland", tier: "scotland", park: false, kicker: "Scotland · Highlands & Islands", hills: [
+    ["Sgurr Alasdair", 992, 57.2068, -6.2242],
+    ["Sgurr Dearg (Inaccessible Pinnacle)", 986, 57.2136, -6.2349],
+    ["Sgurr nan Gillean", 964, 57.2483, -6.1925],
+    ["Bruach na Frithe", 958, 57.2476, -6.2123],
+    ["Blaven (Bla Bheinn)", 928, 57.2192, -6.0947],
+    ["The Storr", 719, 57.5067, -6.1837],
+    ["The Quiraing", 543, 57.6218, -6.2660]
+  ] },
+  { id: "torridon", name: "Torridon & Wester Ross", country: "Scotland", tier: "scotland", park: false, kicker: "Scotland · Highlands", hills: [
+    ["An Teallach", 1062, 57.8065, -5.2533],
+    ["Liathach", 1055, 57.5636, -5.4641],
+    ["Beinn Eighe", 993, 57.5844, -5.3925],
+    ["Beinn Alligin", 986, 57.5911, -5.5739],
+    ["Slioch", 981, 57.6665, -5.3481],
+    ["Beinn Dearg (Torridon)", 914, 57.5880, -5.5234]
+  ] },
+  { id: "kintail", name: "Kintail & Glen Shiel", country: "Scotland", tier: "scotland", park: false, kicker: "Scotland · Highlands", hills: [
+    ["Sgurr Fhuaran", 1067, 57.1963, -5.3485],
+    ["Beinn Fhada", 1032, 57.2205, -5.2844],
+    ["Sgurr na Ciste Duibhe", 1027, 57.1795, -5.3387],
+    ["The Saddle", 1010, 57.1621, -5.4182],
+    ["Ladhar Bheinn", 1020, 57.0754, -5.5934]
+  ] },
+  { id: "breadalbane", name: "Perthshire & Breadalbane", country: "Scotland", tier: "scotland", park: false, kicker: "Scotland · Highlands", hills: [
+    ["Ben Lawers", 1214, 56.5447, -4.2201],
+    ["Schiehallion", 1083, 56.6672, -4.1016],
+    ["Beinn Dorain", 1076, 56.5024, -4.7230],
+    ["Meall nan Tarmachan", 1044, 56.5217, -4.3017],
+    ["Ben Challum", 1025, 56.4542, -4.6205],
+    ["Ben Chonzie", 931, 56.4533, -3.9924]
+  ] },
+  { id: "northwest-highlands", name: "Northwest Highlands", country: "Scotland", tier: "scotland", park: false, kicker: "Scotland · Far North", hills: [
+    ["Ben More Assynt", 998, 58.1377, -4.8587],
+    ["Ben Hope", 927, 58.4127, -4.6087],
+    ["Foinaven (Ganu Mor)", 908, 58.4103, -4.8859],
+    ["Quinag", 808, 58.2151, -5.0505],
+    ["Suilven", 731, 58.1150, -5.1371],
+    ["Ben Loyal", 764, 58.4053, -4.4352],
+    ["Stac Pollaidh", 612, 58.0350, -5.2080]
+  ] },
+  { id: "arran", name: "Isle of Arran", country: "Scotland", tier: "scotland", park: false, kicker: "Scotland · Islands", hills: [
+    ["Goat Fell", 874, 55.6255, -5.1925],
+    ["Caisteal Abhail", 859, 55.6497, -5.2294],
+    ["Cir Mhor", 799, 55.6373, -5.2221]
+  ] },
+  { id: "southern-uplands", name: "Southern Uplands", country: "Scotland", tier: "mountain", park: false, kicker: "Scotland · Borders & Galloway", hills: [
+    ["Merrick", 843, 55.1388, -4.4693],
+    ["Broad Law", 840, 55.4978, -3.3534],
+    ["White Coomb", 822, 55.4217, -3.3239],
+    ["Hart Fell", 808, 55.4191, -3.4028],
+    ["Cairnsmore of Fleet", 711, 54.9759, -4.3436]
+  ] },
+  { id: "clwydian", name: "Clwydian Range", country: "Wales", tier: "general", park: false, kicker: "Wales · North East", hills: [
+    ["Moel Famau", 554, 53.1539, -3.2546],
+    ["Moel Fenlli", 511, 53.1306, -3.2509],
+    ["Moel Arthur", 456, 53.1842, -3.2809],
+    ["Penycloddiau", 440, 53.2001, -3.3068]
+  ] },
+  { id: "gower", name: "Gower Peninsula", country: "Wales", tier: "general", park: false, kicker: "Wales · Coast", hills: [
+    ["Rhossili Down", 193, 51.5844, -4.2603],
+    ["Worms Head", 50, 51.5683, -4.3258],
+    ["Three Cliffs Bay", 30, 51.5656, -4.1073]
+  ] },
+  { id: "north-pennines", name: "North Pennines & Howgills", country: "England", tier: "mountain", park: false, kicker: "England · Pennines", hills: [
+    ["Cross Fell", 893, 54.7027, -2.4872],
+    ["Great Dun Fell", 848, 54.6822, -2.4513],
+    ["Mickle Fell", 788, 54.6135, -2.3050],
+    ["The Calf (Howgills)", 676, 54.3674, -2.5140],
+    ["High Cup Nick", 600, 54.6285, -2.3996]
+  ] },
+  { id: "bowland", name: "Bowland & Pendle", country: "England", tier: "general", park: false, kicker: "England · Lancashire", hills: [
+    ["Pendle Hill", 557, 53.8684, -2.3011],
+    ["Fair Snape Fell", 520, 53.9229, -2.6197],
+    ["Winter Hill", 456, 53.6295, -2.5141],
+    ["Parlick", 432, 53.8969, -2.6163]
+  ] },
+  { id: "shropshire-hills", name: "Shropshire Hills", country: "England", tier: "general", park: false, kicker: "England · Welsh Marches", hills: [
+    ["Brown Clee Hill", 540, 52.4794, -2.6007],
+    ["Stiperstones", 536, 52.5896, -2.9343],
+    ["Titterstone Clee", 533, 52.3976, -2.5996],
+    ["The Long Mynd (Pole Bank)", 516, 52.5677, -2.8630],
+    ["Caer Caradoc", 459, 52.5530, -2.7728],
+    ["The Wrekin", 407, 52.6693, -2.5515]
+  ] },
+  { id: "malverns-cotswolds", name: "Malverns & Cotswolds", country: "England", tier: "general", park: false, kicker: "England · West Midlands", hills: [
+    ["Worcestershire Beacon", 425, 52.1046, -2.3387],
+    ["British Camp", 338, 52.0606, -2.3515],
+    ["Cleeve Hill", 330, 51.9370, -2.0232],
+    ["May Hill", 296, 51.8885, -2.4431]
+  ] },
+  { id: "mournes", name: "Mourne Mountains", country: "Northern Ireland", tier: "general", park: false, kicker: "Northern Ireland · County Down", hills: [
+    ["Slieve Donard", 849, 54.1808, -5.9201],
+    ["Slieve Commedagh", 767, 54.1830, -5.9440],
+    ["Slieve Binnian", 747, 54.1547, -5.9732],
+    ["Slieve Bearnagh", 727, 54.1767, -5.9797]
+  ] },
+  { id: "loch-lomond", name: "Loch Lomond & The Trossachs", country: "Scotland", tier: "scotland", park: true, kicker: "Scotland · National Park", hills: [
     ["Ben More", 1174, 56.3858, -4.5413],
     ["Stob Binnein", 1165, 56.3706, -4.5371],
     ["Beinn Ime", 1011, 56.2369, -4.8171],
@@ -523,7 +630,7 @@ if (typeof module !== "undefined") {
   function writeCache(o) { try { localStorage.setItem(cacheKey(), JSON.stringify(o)); } catch (e) {} }
 
   function buildPicker() {
-    var order = ["Wales", "England", "Scotland"], html = "";
+    var order = ["Wales", "England", "Scotland", "Northern Ireland"], html = "";
     order.forEach(function (c) {
       var rs = REGIONS.filter(function (r) { return r.country === c; });
       html += '<optgroup label="' + c + '">' + rs.map(function (r) { return '<option value="' + r.id + '">' + esc(r.name) + "</option>"; }).join("") + "</optgroup>";
@@ -532,7 +639,7 @@ if (typeof module !== "undefined") {
   }
   function paintRegion() {
     $("#area").value = region.id;
-    $("#kicker").textContent = region.country + " \u00b7 National Park";
+    $("#kicker").textContent = region.kicker;
     $("#title").textContent = region.name.replace(/ \(.*\)$/, "") + " Hill Picker";
     document.title = region.name.replace(/ \(.*\)$/, "") + " Hill Picker";
     var links = LINKS[region.tier] || LINKS.general;
