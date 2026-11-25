@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hill Picker">
 <meta name="theme-color" content="#1D5B63">
-<title>Snowdonia Hill Picker</title>
+<title>UK Hill Picker</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231D5B63'/%3E%3Cpath d='M4 25 12 11l5 8 3-4 8 10z' fill='%23EEF1EF'/%3E%3C/svg%3E">
 <style>
 /* Layout: one narrow column built for a phone. Day picker first, then a ranked
@@ -131,6 +131,9 @@ ol.hills { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .showall { width: 100%; margin-top: 10px; }
 .demo { background: var(--warn-bg); color: var(--poor); border-radius: 10px; padding: 8px 12px; font-weight: 700; font-size: .85rem; margin: 0 0 12px; }
 
+.picker { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.picker label { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.picker select { flex: 1; min-width: 0; font: inherit; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .safety { margin-top: 22px; padding: 14px 16px; border-left: 4px solid var(--poor); background: var(--surface); border-radius: 0 12px 12px 0; font-size: .88rem; }
 .safety p { margin: 0 0 6px; }
 .safety p:last-child { margin: 0; }
@@ -144,50 +147,182 @@ a { color: var(--accent); }
 <div class="wrap">
   <header class="top">
     <div>
-      <p class="kicker">Eryri &middot; Snowdonia</p>
-      <h1>Snowdonia Hill Picker</h1>
-      <p class="sub">Which summit suits the weather, 09:00&ndash;16:00</p>
+      <p class="kicker" id="kicker">United Kingdom &middot; National Parks</p>
+      <h1 id="title">UK Hill Picker</h1>
+      <p class="sub">Which hill or walk suits the weather, 09:00&ndash;16:00</p>
     </div>
     <button class="refresh" id="refresh" type="button">Refresh</button>
   </header>
 
+  <div class="picker"><label for="area">Area</label><select id="area"></select></div>
   <div class="days" id="days" role="group" aria-label="Choose a day"></div>
   <div id="main" aria-live="polite"><div class="msg">Loading forecasts&hellip;</div></div>
   <noscript><div class="msg err">This page needs JavaScript to load the forecast.</div></noscript>
 
   <section class="safety" aria-label="Safety">
     <p><b>Planning aid only, not a safety tool.</b> Scores are a rough guide built from model forecasts, and mountain weather changes fast. Always check the official mountain forecast before you set out.</p>
-    <p><a href="https://weather.metoffice.gov.uk/specialist-forecasts/mountain" target="_blank" rel="noopener">Met Office mountain forecast</a> &middot; <a href="https://mwis.org.uk" target="_blank" rel="noopener">MWIS</a></p>
+    <p id="safelinks"></p>
   </section>
   <footer>
     <p id="updated"></p>
-    <p>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), non-commercial use. Summit positions are approximate.</p>
+    <p>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), non-commercial use. Hill and place positions are approximate.</p>
   </footer>
 </div>
 
 <script id="core">
 /* ---- Core logic: hills, scoring, grouping. No DOM access here. ---- */
-var HILLS = [
-  ["Yr Wyddfa (Snowdon)", 1085, 53.0685, -4.0763],
-  ["Crib Goch", 923, 53.0760, -4.0530],
-  ["Yr Aran", 747, 53.0505, -4.0390],
-  ["Moel Hebog", 783, 52.9970, -4.1050],
-  ["Moel Siabod", 872, 53.0935, -3.9335],
-  ["Cnicht", 689, 52.9795, -4.0020],
-  ["Glyder Fawr", 999, 53.1030, -4.0350],
-  ["Glyder Fach", 994, 53.1030, -4.0250],
-  ["Tryfan", 917, 53.1140, -3.9980],
-  ["Y Garn", 947, 53.1160, -4.0480],
-  ["Elidir Fawr", 924, 53.1335, -4.0820],
-  ["Pen yr Ole Wen", 978, 53.1500, -3.9970],
-  ["Carnedd Dafydd", 1044, 53.1570, -3.9840],
-  ["Carnedd Llewelyn", 1064, 53.1800, -3.9700],
-  ["Foel Grach", 976, 53.1710, -3.9720],
-  ["Foel-fras", 942, 53.2110, -3.9570],
-  ["Cadair Idris (Penygadair)", 893, 52.6997, -3.9089],
-  ["Aran Fawddwy", 905, 52.7885, -3.6880],
-  ["Arenig Fawr", 854, 52.9190, -3.7380]
+var REGIONS = [
+  { id: "snowdonia", name: "Snowdonia (Eryri)", country: "Wales", tier: "mountain", hills: [
+    ["Yr Wyddfa (Snowdon)", 1085, 53.0685, -4.0763],
+    ["Crib Goch", 923, 53.0760, -4.0530],
+    ["Yr Aran", 747, 53.0505, -4.0390],
+    ["Moel Hebog", 783, 52.9970, -4.1050],
+    ["Moel Siabod", 872, 53.0935, -3.9335],
+    ["Cnicht", 689, 52.9795, -4.0020],
+    ["Glyder Fawr", 999, 53.1030, -4.0350],
+    ["Glyder Fach", 994, 53.1030, -4.0250],
+    ["Tryfan", 917, 53.1140, -3.9980],
+    ["Y Garn", 947, 53.1160, -4.0480],
+    ["Elidir Fawr", 924, 53.1335, -4.0820],
+    ["Pen yr Ole Wen", 978, 53.1500, -3.9970],
+    ["Carnedd Dafydd", 1044, 53.1570, -3.9840],
+    ["Carnedd Llewelyn", 1064, 53.1800, -3.9700],
+    ["Foel Grach", 976, 53.1710, -3.9720],
+    ["Foel-fras", 942, 53.2110, -3.9570],
+    ["Cadair Idris (Penygadair)", 893, 52.6997, -3.9089],
+    ["Aran Fawddwy", 905, 52.7885, -3.6880],
+    ["Arenig Fawr", 854, 52.9190, -3.7380]
+  ] },
+  { id: "brecon-beacons", name: "Brecon Beacons (Bannau Brycheiniog)", country: "Wales", tier: "mountain", hills: [
+    ["Pen y Fan", 886, 51.8842, -3.4369],
+    ["Corn Du", 873, 51.8814, -3.4440],
+    ["Cribyn", 795, 51.8789, -3.4236],
+    ["Fan y Big", 719, 51.8756, -3.4017],
+    ["Fan Brycheiniog", 802, 51.8823, -3.7129],
+    ["Waun Fach", 811, 51.9620, -3.1439],
+    ["Hay Bluff", 677, 52.0000, -3.1000],
+    ["Sugar Loaf", 596, 51.8570, -3.0570],
+    ["Blorenge", 561, 51.7970, -3.0630]
+  ] },
+  { id: "pembrokeshire", name: "Pembrokeshire Coast", country: "Wales", tier: "general", hills: [
+    ["Carn Ingli", 347, 52.0000, -4.8500],
+    ["Carn Llidi", 181, 51.9000, -5.3100],
+    ["Strumble Head", 40, 52.0310, -5.0680],
+    ["Stackpole Head", 40, 51.6000, -4.9200]
+  ] },
+  { id: "lake-district", name: "Lake District", country: "England", tier: "mountain", hills: [
+    ["Scafell Pike", 978, 54.4541, -3.2123],
+    ["Helvellyn", 950, 54.5269, -3.0182],
+    ["Skiddaw", 931, 54.6506, -3.1484],
+    ["Great Gable", 899, 54.4828, -3.2193],
+    ["Bowfell", 902, 54.4474, -3.1674],
+    ["Pillar", 892, 54.4965, -3.2815],
+    ["Blencathra", 868, 54.6399, -3.0505],
+    ["Fairfield", 873, 54.4965, -2.9927],
+    ["Grasmoor", 852, 54.5711, -3.2792],
+    ["High Street", 828, 54.4912, -2.8660],
+    ["Coniston Old Man", 803, 54.3705, -3.1221],
+    ["Red Pike (Buttermere)", 755, 54.5269, -3.2994],
+    ["Haystacks", 597, 54.5068, -3.2478],
+    ["Catbells", 451, 54.5677, -3.1708]
+  ] },
+  { id: "peak-district", name: "Peak District", country: "England", tier: "mountain", hills: [
+    ["Kinder Scout", 636, 53.3843, -1.8737],
+    ["Bleaklow", 633, 53.4616, -1.8629],
+    ["Black Hill", 582, 53.5407, -1.8853],
+    ["Shining Tor", 559, 53.2603, -2.0105],
+    ["Mam Tor", 517, 53.3491, -1.8092],
+    ["Shutlingsloe", 506, 53.2234, -2.0374],
+    ["The Roaches", 505, 53.1731, -1.9955],
+    ["Lose Hill", 476, 53.3644, -1.7715],
+    ["Win Hill", 462, 53.3624, -1.7205],
+    ["Stanage Edge (High Neb)", 458, 53.3623, -1.6589],
+    ["Chrome Hill", 425, 53.2027, -1.8967]
+  ] },
+  { id: "yorkshire-dales", name: "Yorkshire Dales", country: "England", tier: "mountain", hills: [
+    ["Whernside", 736, 54.2276, -2.4034],
+    ["Ingleborough", 723, 54.1665, -2.3982],
+    ["Great Shunner Fell", 716, 54.3710, -2.2339],
+    ["Wild Boar Fell", 708, 54.3841, -2.3741],
+    ["Great Whernside", 704, 54.1609, -1.9984],
+    ["Buckden Pike", 702, 54.2049, -2.0598],
+    ["Pen-y-ghent", 694, 54.1562, -2.2496],
+    ["Simon's Seat", 485, 54.0341, -1.8809]
+  ] },
+  { id: "north-york-moors", name: "North York Moors", country: "England", tier: "general", hills: [
+    ["Round Hill (Urra Moor)", 454, 54.4055, -1.0803],
+    ["Cringle Moor", 433, 54.4196, -1.1770],
+    ["Roseberry Topping", 320, 54.5054, -1.1074],
+    ["Sutton Bank", 297, 54.2401, -1.2113]
+  ] },
+  { id: "northumberland", name: "Northumberland", country: "England", tier: "general", hills: [
+    ["The Cheviot", 815, 55.4782, -2.1455],
+    ["Hedgehope Hill", 714, 55.4711, -2.0901],
+    ["Windy Gyle", 619, 55.4305, -2.2307],
+    ["Simonside", 430, 55.2833, -1.9464],
+    ["Housesteads Crags", 300, 55.0133, -2.3299]
+  ] },
+  { id: "dartmoor", name: "Dartmoor", country: "England", tier: "general", hills: [
+    ["High Willhays", 621, 50.6860, -4.0115],
+    ["Yes Tor", 619, 50.6923, -4.0104],
+    ["Cosdon Beacon", 550, 50.7089, -3.9303],
+    ["Great Mis Tor", 538, 50.5741, -4.0336],
+    ["Rippon Tor", 473, 50.5667, -3.7706],
+    ["Haytor", 457, 50.5804, -3.7570],
+    ["Hound Tor", 414, 50.5953, -3.7787],
+    ["Brent Tor", 330, 50.6033, -4.1606]
+  ] },
+  { id: "exmoor", name: "Exmoor", country: "England", tier: "general", hills: [
+    ["Dunkery Beacon", 519, 51.1620, -3.5874],
+    ["Selworthy Beacon", 308, 51.2182, -3.5506],
+    ["Great Hangman", 318, 51.2130, -4.0300],
+    ["Foreland Point", 200, 51.2330, -3.7900]
+  ] },
+  { id: "new-forest", name: "New Forest", country: "England", tier: "general", hills: [
+    ["Fritham", 60, 50.9350, -1.6250],
+    ["Lyndhurst", 30, 50.8710, -1.5920],
+    ["Brockenhurst", 15, 50.8190, -1.5740],
+    ["Burley", 40, 50.8330, -1.7020]
+  ] },
+  { id: "south-downs", name: "South Downs", country: "England", tier: "general", hills: [
+    ["Black Down", 280, 51.0000, -0.6900],
+    ["Butser Hill", 271, 50.9776, -0.9758],
+    ["Ditchling Beacon", 248, 50.9011, -0.1071],
+    ["Chanctonbury Ring", 238, 50.8963, -0.3818],
+    ["Devil's Dyke", 217, 50.8848, -0.2116],
+    ["Firle Beacon", 217, 50.8336, 0.1074],
+    ["Beachy Head", 162, 50.7364, 0.2561]
+  ] },
+  { id: "broads", name: "The Broads", country: "England", tier: "general", hills: [
+    ["Hickling Broad", 2, 52.7000, 1.5800],
+    ["Barton Broad", 2, 52.7300, 1.5000],
+    ["Wroxham", 5, 52.7130, 1.4000],
+    ["Reedham", 3, 52.5620, 1.5650]
+  ] },
+  { id: "cairngorms", name: "Cairngorms", country: "Scotland", tier: "scotland", hills: [
+    ["Ben Macdui", 1309, 57.0700, -3.6691],
+    ["Braeriach", 1296, 57.0782, -3.7288],
+    ["Cairn Toul", 1291, 57.0542, -3.7112],
+    ["Cairn Gorm", 1245, 57.1161, -3.6447],
+    ["Beinn a' Bhuird", 1197, 57.0875, -3.4900],
+    ["Ben Avon", 1171, 57.0990, -3.4343],
+    ["Lochnagar", 1155, 56.9617, -3.2446],
+    ["Bynack More", 1090, 57.1376, -3.5845],
+    ["Meall a' Bhuachaille", 810, 57.1841, -3.6726]
+  ] },
+  { id: "loch-lomond", name: "Loch Lomond & The Trossachs", country: "Scotland", tier: "scotland", hills: [
+    ["Ben More", 1174, 56.3858, -4.5413],
+    ["Stob Binnein", 1165, 56.3706, -4.5371],
+    ["Beinn Ime", 1011, 56.2369, -4.8171],
+    ["Ben Lomond", 974, 56.1906, -4.6332],
+    ["Ben Vorlich", 943, 56.2725, -4.7551],
+    ["Beinn Narnain", 926, 56.2213, -4.7901],
+    ["The Cobbler (Ben Arthur)", 884, 56.2128, -4.8089],
+    ["Ben Ledi", 879, 56.2589, -4.3230],
+    ["Ben Venue", 729, 56.2238, -4.4628]
+  ] }
 ];
+var HILLS = REGIONS[0].hills; /* Snowdonia: kept as the default area and for the tests */
 var HOURLY = ["temperature_2m", "apparent_temperature", "precipitation", "precipitation_probability",
   "cloud_cover_low", "cloud_cover_mid", "visibility", "wind_gusts_10m", "freezing_level_height"];
 var WIN_FROM = 9, WIN_TO = 16;
@@ -350,30 +485,65 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_KEY = "shp-snowdonia-v6", CACHE_MIN = 60, DAYS = 4, TOP = 10;
+  var CACHE_PREFIX = "shp-v7-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
-  var data = null, sel = 0, showAll = false, failed = null;
+  var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
+
+  var LINKS = {
+    mountain: [["Met Office mountain forecast", "https://weather.metoffice.gov.uk/specialist-forecasts/mountain"], ["MWIS", "https://mwis.org.uk"]],
+    scotland: [["Met Office mountain forecast", "https://weather.metoffice.gov.uk/specialist-forecasts/mountain"], ["MWIS", "https://mwis.org.uk"], ["SAIS avalanche reports", "https://www.sais.gov.uk"]],
+    general: [["Met Office forecast", "https://www.metoffice.gov.uk/weather/forecast"], ["MWIS", "https://mwis.org.uk"]]
+  };
+  function findRegion(id) {
+    for (var i = 0; i < REGIONS.length; i++) if (REGIONS[i].id === id) return REGIONS[i];
+    return null;
+  }
+  function initialArea() {
+    var h = location.hash.replace("#", "");
+    if (findRegion(h)) return findRegion(h);
+    try { var s = localStorage.getItem(AREA_KEY); if (findRegion(s)) return findRegion(s); } catch (e) {}
+    return REGIONS[0];
+  }
+  var region = initialArea();
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function grade(n) { return n >= 70 ? ["good", "Good"] : n >= 45 ? ["fair", "Fair"] : ["poor", "Poor"]; }
   function fmt(date, opts) { return new Date(date + "T12:00:00").toLocaleDateString("en-GB", opts); }
 
+  function cacheKey() { return CACHE_PREFIX + region.id; }
   function readCache() {
     try {
-      var o = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+      var o = JSON.parse(localStorage.getItem(cacheKey()) || "null");
       if (o && !o.demo && Date.now() - o.fetchedAt < CACHE_MIN * 60000) return o;
     } catch (e) {}
     return null;
   }
-  function writeCache(o) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(o)); } catch (e) {} }
+  function writeCache(o) { try { localStorage.setItem(cacheKey(), JSON.stringify(o)); } catch (e) {} }
 
-  function fetchForecast() {
+  function buildPicker() {
+    var order = ["Wales", "England", "Scotland"], html = "";
+    order.forEach(function (c) {
+      var rs = REGIONS.filter(function (r) { return r.country === c; });
+      html += '<optgroup label="' + c + '">' + rs.map(function (r) { return '<option value="' + r.id + '">' + esc(r.name) + "</option>"; }).join("") + "</optgroup>";
+    });
+    $("#area").innerHTML = html;
+  }
+  function paintRegion() {
+    $("#area").value = region.id;
+    $("#kicker").textContent = region.country + " \u00b7 National Park";
+    $("#title").textContent = region.name.replace(/ \(.*\)$/, "") + " Hill Picker";
+    document.title = region.name.replace(/ \(.*\)$/, "") + " Hill Picker";
+    var links = LINKS[region.tier] || LINKS.general;
+    $("#safelinks").innerHTML = links.map(function (l) { return '<a href="' + l[1] + '" target="_blank" rel="noopener">' + l[0] + "</a>"; }).join(" &middot; ");
+  }
+
+  function fetchForecast(hills) {
     var p = new URLSearchParams({
-      latitude: HILLS.map(function (h) { return h[2].toFixed(4); }).join(","),
-      longitude: HILLS.map(function (h) { return h[3].toFixed(4); }).join(","),
-      elevation: HILLS.map(function (h) { return Math.round(h[1]); }).join(","),
+      latitude: hills.map(function (h) { return h[2].toFixed(4); }).join(","),
+      longitude: hills.map(function (h) { return h[3].toFixed(4); }).join(","),
+      elevation: hills.map(function (h) { return Math.round(h[1]); }).join(","),
       hourly: HOURLY.join(","),
       wind_speed_unit: "mph",
       timezone: "Europe/London",
@@ -389,8 +559,9 @@ if (typeof module !== "undefined") {
 
   function load(force) {
     failed = null;
+    var hills = region.hills, mine = ++token;
     if (demo) {
-      data = { fetchedAt: Date.now(), demo: true, days: buildResults(HILLS.map(function (h) { return demoSeries(h, DAYS); })) };
+      data = { fetchedAt: Date.now(), demo: true, days: buildResults(hills.map(function (h) { return demoSeries(h, DAYS); }), hills) };
       return render();
     }
     if (!force) {
@@ -399,12 +570,15 @@ if (typeof module !== "undefined") {
     }
     $("#refresh").disabled = true;
     $("#main").innerHTML = '<div class="msg">Loading forecasts&hellip;</div>';
-    fetchForecast().then(function (series) {
-      data = { fetchedAt: Date.now(), demo: false, days: buildResults(series) };
+    fetchForecast(hills).then(function (series) {
+      if (mine !== token) return;
+      data = { fetchedAt: Date.now(), demo: false, days: buildResults(series, hills) };
       writeCache(data);
     }).catch(function (e) {
+      if (mine !== token) return;
+      data = null;
       failed = (e && e.name === "AbortError") ? "The forecast service took too long to answer." : (e && e.message && e.message.indexOf("service returned") > -1 ? e.message : "Couldn't reach the forecast service. Check your connection.");
-    }).then(function () { $("#refresh").disabled = false; render(); });
+    }).then(function () { if (mine !== token) return; $("#refresh").disabled = false; render(); });
   }
 
   function hillHtml(h, i) {
@@ -446,9 +620,9 @@ if (typeof module !== "undefined") {
     var list = showAll ? day.hills : day.hills.slice(0, TOP);
     main.innerHTML =
       (data.demo ? '<p class="demo">DEMO DATA: invented numbers, not real weather.</p>' : "") +
-      '<div class="listhead"><h2>' + fmt(day.date, { weekday: "long", day: "numeric", month: "short" }) + "</h2><small>Tap a hill for detail</small></div>" +
+      '<div class="listhead"><h2>' + fmt(day.date, { weekday: "long", day: "numeric", month: "short" }) + "</h2><small>Tap a place for detail</small></div>" +
       '<ol class="hills">' + list.map(hillHtml).join("") + "</ol>" +
-      (day.hills.length > TOP ? '<button class="showall" type="button" id="showall">' + (showAll ? "Show top " + TOP : "Show all " + day.hills.length + " hills") + "</button>" : "");
+      (day.hills.length > TOP ? '<button class="showall" type="button" id="showall">' + (showAll ? "Show top " + TOP : "Show all " + day.hills.length + " places") + "</button>" : "");
     var t = new Date(data.fetchedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
     $("#updated").textContent = (data.demo ? "Demo data generated " : "Forecast updated ") + t + ".";
   }
@@ -461,7 +635,21 @@ if (typeof module !== "undefined") {
     else if (b.id === "retry") { load(true); }
     else if (b.id === "refresh") { load(true); }
   });
-  window.addEventListener("hashchange", function () { location.reload(); });
+  $("#area").addEventListener("change", function () {
+    var r = findRegion(this.value);
+    if (!r) return;
+    region = r; sel = 0; showAll = false; data = null;
+    try { localStorage.setItem(AREA_KEY, r.id); } catch (e) {}
+    if (!demo) { try { history.replaceState(null, "", "#" + r.id); } catch (e) {} }
+    paintRegion(); load(false);
+  });
+  window.addEventListener("hashchange", function () {
+    var h = location.hash.replace("#", "");
+    if (h === "demo") { demo = true; }
+    else { demo = false; if (findRegion(h)) region = findRegion(h); }
+    sel = 0; showAll = false; data = null; paintRegion(); load(false);
+  });
+  buildPicker(); paintRegion();
   load(false);
 })();
 </script>
