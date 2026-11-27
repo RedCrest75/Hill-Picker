@@ -27,6 +27,8 @@
   --fair: #A8690F;
   --poor: #B4432F;
   --warn-bg: #F8E1DB;
+  --mod-bg: #FBEFD5;
+  --mod-ink: #8A5508;
   --info-bg: #E1EEF0;
   --sun: #E3A52F;
   --cloud: #B7C4C0;
@@ -48,6 +50,8 @@
     --fair: #E0B454;
     --poor: #EE8A73;
     --warn-bg: #3A1F19;
+    --mod-bg: #3A2C12;
+    --mod-ink: #E8BE5E;
     --info-bg: #17303A;
     --sun: #F2C65C;
     --cloud: #5E716C;
@@ -123,6 +127,7 @@ ol.hills { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .chips { grid-column: 2 / 5; display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font-size: .76rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
 .chip.warn { background: var(--warn-bg); color: var(--poor); }
+.chip.mod { background: var(--mod-bg); color: var(--mod-ink); }
 .chip.info { background: var(--info-bg); color: var(--accent); }
 .bar { grid-column: 1 / 5; height: 6px; margin: 4px -14px 0; background: var(--track); }
 .bar span { display: block; height: 100%; background: var(--c); }
@@ -445,6 +450,16 @@ var WIN_FROM = 9, WIN_TO = 16;
 /* Score weights: clear tops first, then dryness, then wind. Dangerous gusts still cap the score. */
 var W_VIEW = 0.45, W_RAIN = 0.35, W_WIND = 0.20;
 var MODERATE_RAIN_MM = 5, HEAVY_RAIN_MM = 15; /* total mm in the walking window */
+var MODERATE_GUST_MPH = 25; /* strongest gust in the window; 30+ is "strong" */
+
+/* Chip colour for a flag. Any flag that starts with "moderate" is amber, so new
+   moderate flags pick up the colour automatically. Freezing level and murk are
+   blue info chips; everything else is a red warning. */
+function flagKind(f) {
+  if (f.indexOf("moderate") === 0) return "mod";
+  if (f.indexOf("freezing") === 0 || f.indexOf("murky") === 0) return "info";
+  return "warn";
+}
 
 function clean(a) { return a.filter(function (v) { return v !== null && v !== undefined && !isNaN(v); }); }
 function mean(a, d) { var c = clean(a); return c.length ? c.reduce(function (x, y) { return x + y; }, 0) / c.length : d; }
@@ -480,6 +495,7 @@ function scoreDay(hours, summitM) {
   if (gust >= 55) { total = Math.min(total, 15); flags.push("dangerous gusts"); }
   else if (gust >= 40) { total = Math.min(total, 45); flags.push("very strong gusts - exposed ridges risky"); }
   else if (gust >= 30) { flags.push("strong gusts"); }
+  else if (gust >= MODERATE_GUST_MPH) { flags.push("moderate gusts"); }
   if (mm >= HEAVY_RAIN_MM) flags.push("heavy rain");
   else if (mm >= MODERATE_RAIN_MM) flags.push("moderate rain");
   if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
@@ -599,14 +615,14 @@ function demoSeries(hill, days) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
+  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, flagKind: flagKind, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
 }
 </script>
 
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_PREFIX = "shp-v8-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
+  var CACHE_PREFIX = "shp-v9-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
@@ -703,8 +719,7 @@ if (typeof module !== "undefined") {
   function hillHtml(h, i) {
     var g = grade(h.score);
     var chips = h.flags.map(function (f) {
-      var kind = (f.indexOf("freezing") === 0 || f.indexOf("murky") === 0) ? "info" : "warn";
-      return '<span class="chip ' + kind + '">' + esc(cap(f)) + "</span>";
+      return '<span class="chip ' + flagKind(f) + '">' + esc(cap(f)) + "</span>";
     }).join("");
     var rows = [["Views", h.view], ["Dryness", h.rain], ["Calm", h.wind]].map(function (r) {
       return '<div class="row"><span>' + r[0] + '</span><span class="t"><span style="width:' + r[1] + '%"></span></span><b>' + r[1] + "</b></div>";
@@ -717,7 +732,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Longer bars are better. Score = 45% views, 35% dryness, 20% calm. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Moderate rain is 5 mm or more in that window, heavy rain 15 mm or more. Gusts of 40 mph or more cap the score.</p></div></details></li>';
+      '<p class="note">Longer bars are better. Score = 45% views, 35% dryness, 20% calm. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Moderate rain is 5 mm or more in that window, heavy rain 15 mm or more. Moderate gusts are 25&ndash;29 mph, strong gusts 30 mph or more. Gusts of 40 mph or more cap the score.</p></div></details></li>';
   }
 
   function render() {
