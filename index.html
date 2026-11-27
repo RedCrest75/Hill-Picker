@@ -442,6 +442,9 @@ var HILLS = REGIONS[0].hills; /* Snowdonia: kept as the default area and for the
 var HOURLY = ["temperature_2m", "apparent_temperature", "precipitation", "precipitation_probability",
   "cloud_cover_low", "cloud_cover_mid", "visibility", "wind_gusts_10m", "freezing_level_height"];
 var WIN_FROM = 9, WIN_TO = 16;
+/* Score weights: clear tops first, then dryness, then wind. Dangerous gusts still cap the score. */
+var W_VIEW = 0.45, W_RAIN = 0.35, W_WIND = 0.20;
+var MODERATE_RAIN_MM = 5, HEAVY_RAIN_MM = 15; /* total mm in the walking window */
 
 function clean(a) { return a.filter(function (v) { return v !== null && v !== undefined && !isNaN(v); }); }
 function mean(a, d) { var c = clean(a); return c.length ? c.reduce(function (x, y) { return x + y; }, 0) / c.length : d; }
@@ -468,15 +471,17 @@ function scoreDay(hours, summitM) {
   var view = 0.7 * cloudView + 0.3 * lerpScore(visKm, 20, 1);
   var wind = lerpScore(gust, 20, 50);
   var chanceWeight = 0.4 + 0.6 * Math.min(1, mm / 2); // chance counts 40% with no rain forecast, fully from 2 mm
-  var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg * chanceWeight - Math.min(mm * 8, 50)));
+  // Amount penalty keeps growing up to 15 mm, so 6 mm and 15 mm no longer score the same.
+  var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg * chanceWeight - Math.min(mm * 4, 60)));
 
-  var total = 0.35 * view + 0.35 * wind + 0.30 * rain;
+  var total = W_VIEW * view + W_RAIN * rain + W_WIND * wind;
 
   var flags = [];
   if (gust >= 55) { total = Math.min(total, 15); flags.push("dangerous gusts"); }
   else if (gust >= 40) { total = Math.min(total, 45); flags.push("very strong gusts - exposed ridges risky"); }
   else if (gust >= 30) { flags.push("strong gusts"); }
-  if (mm >= 15) flags.push("heavy rain");
+  if (mm >= HEAVY_RAIN_MM) flags.push("heavy rain");
+  else if (mm >= MODERATE_RAIN_MM) flags.push("moderate rain");
   if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
   if (low >= 90) flags.push("murky and damp - tops likely in cloud");
 
@@ -601,7 +606,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_PREFIX = "shp-v7-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
+  var CACHE_PREFIX = "shp-v8-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
@@ -648,7 +653,7 @@ if (typeof module !== "undefined") {
   }
   function paintRegion() {
     $("#area").value = region.id;
-    document.title = "Clear Tops \u2013 " + region.name.replace(/ \(.*\)$/, "");
+    document.title = "Clear Tops – " + region.name.replace(/ \(.*\)$/, "");
     var links = LINKS[region.tier] || LINKS.general;
     $("#safelinks").innerHTML = links.map(function (l) { return '<a href="' + l[1] + '" target="_blank" rel="noopener">' + l[0] + "</a>"; }).join(" &middot; ");
   }
@@ -701,7 +706,7 @@ if (typeof module !== "undefined") {
       var kind = (f.indexOf("freezing") === 0 || f.indexOf("murky") === 0) ? "info" : "warn";
       return '<span class="chip ' + kind + '">' + esc(cap(f)) + "</span>";
     }).join("");
-    var rows = [["Views", h.view], ["Calm", h.wind], ["Dryness", h.rain]].map(function (r) {
+    var rows = [["Views", h.view], ["Dryness", h.rain], ["Calm", h.wind]].map(function (r) {
       return '<div class="row"><span>' + r[0] + '</span><span class="t"><span style="width:' + r[1] + '%"></span></span><b>' + r[1] + "</b></div>";
     }).join("");
     return '<li><details class="hill ' + g[0] + '"><summary>' +
@@ -712,7 +717,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Longer bars are better. Score = 35% views, 35% calm, 30% dryness. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Gusts of 40 mph or more cap the score.</p></div></details></li>';
+      '<p class="note">Longer bars are better. Score = 45% views, 35% dryness, 20% calm. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Moderate rain is 5 mm or more in that window, heavy rain 15 mm or more. Gusts of 40 mph or more cap the score.</p></div></details></li>';
   }
 
   function render() {
