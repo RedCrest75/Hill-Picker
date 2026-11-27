@@ -174,7 +174,7 @@ a { color: var(--accent); }
   <noscript><div class="msg err">This page needs JavaScript to load the forecast.</div></noscript>
 
   <section class="safety" aria-label="Safety">
-    <p><b>Planning aid only, not a safety tool.</b> Scores are a rough guide built from model forecasts, and mountain weather changes fast. Always check the official mountain forecast before you set out.</p>
+    <p><b>Planning aid only, not a safety tool.</b> Scores are a rough guide built from model forecasts, and mountain weather changes fast. Gusts on exposed summits and ridges can be stronger than shown. Always check the official mountain forecast before you set out.</p>
     <p id="safelinks"></p>
   </section>
   <footer>
@@ -444,12 +444,16 @@ var REGIONS = [
   ] }
 ];
 var HILLS = REGIONS[0].hills; /* Snowdonia: kept as the default area and for the tests */
-var HOURLY = ["temperature_2m", "apparent_temperature", "precipitation", "precipitation_probability",
-  "cloud_cover_low", "cloud_cover_mid", "visibility", "wind_gusts_10m", "freezing_level_height"];
+/* Pressure levels for wind at summit height: roughly 100 m, 500 m, 1,000 m and 1,500 m. */
+var LEVELS = [1000, 950, 900, 850];
+var HOURLY = ["apparent_temperature", "precipitation", "precipitation_probability",
+  "cloud_cover_low", "cloud_cover_mid", "visibility", "wind_gusts_10m", "freezing_level_height"]
+  .concat(LEVELS.map(function (l) { return "wind_speed_" + l + "hPa"; }),
+          LEVELS.map(function (l) { return "geopotential_height_" + l + "hPa"; }));
 var WIN_FROM = 9, WIN_TO = 16;
 /* Score weights: clear tops first, then dryness, then wind. Dangerous gusts still cap the score. */
 var W_VIEW = 0.45, W_RAIN = 0.35, W_WIND = 0.20;
-var MODERATE_RAIN_MM = 5, HEAVY_RAIN_MM = 15; /* total mm in the walking window */
+var MODERATE_RAIN_MM = 4, HEAVY_RAIN_MM = 10; /* total mm in the walking window; checked against MWIS and Mountain Forecast */
 var MODERATE_GUST_MPH = 25; /* strongest gust in the window; 30+ is "strong" */
 
 /* Chip colour for a flag. Any flag that starts with "moderate" is amber, so new
@@ -471,12 +475,35 @@ function lerpScore(x, best, worst) {
   return Math.max(0, Math.min(1, t)) * 100;
 }
 
+/* Wind at the summit's height for one hour, interpolated between pressure levels using
+   their forecast heights. Null if the data is missing or the summit is below the lowest
+   level (very low places), in which case the ground-level gust is used on its own. */
+function summitWind(row, elev) {
+  var pts = [];
+  LEVELS.forEach(function (l) {
+    var z = row["geopotential_height_" + l + "hPa"], w = row["wind_speed_" + l + "hPa"];
+    if (z !== null && z !== undefined && w !== null && w !== undefined && !isNaN(z) && !isNaN(w)) pts.push([z, w]);
+  });
+  pts.sort(function (a, b) { return a[0] - b[0]; });
+  if (pts.length < 2 || elev < pts[0][0]) return null;
+  for (var i = 0; i < pts.length - 1; i++) {
+    if (elev <= pts[i + 1][0]) {
+      var f = (elev - pts[i][0]) / (pts[i + 1][0] - pts[i][0]);
+      return pts[i][1] + f * (pts[i + 1][1] - pts[i][1]);
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+
 function scoreDay(hours, summitM) {
   var col = function (k) { return hours.map(function (h) { return h[k]; }); };
   var low = mean(col("cloud_cover_low"), 0);
   var mid = mean(col("cloud_cover_mid"), 0);
   var visKm = mean(clean(col("visibility")).map(function (v) { return Math.min(v, 40000); }), 20000) / 1000;
-  var gust = vmax(col("wind_gusts_10m"), 0);
+  /* Ground-level gust forecasts run low on summits, so use whichever is higher: the gust
+     forecast or the wind at summit height (which matched MWIS summit gusts in testing). */
+  var gust = Math.max(vmax(col("wind_gusts_10m"), 0),
+    vmax(hours.map(function (h) { return summitWind(h, summitM); }), 0));
   var pavg = mean(col("precipitation_probability"), 0);
   var mm = clean(col("precipitation")).reduce(function (x, y) { return x + y; }, 0);
   var feels = vmin(col("apparent_temperature"), 5);
@@ -600,7 +627,6 @@ function demoSeries(hill, days) {
     var date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
     for (var h = 0; h < 24; h++) {
       out.time.push(ymd(date) + "T" + pad(h) + ":00");
-      out.temperature_2m.push(temp - alt / 6 + u(-1, 1));
       out.apparent_temperature.push(temp - alt / 3 - wind / 8 + u(-1, 1));
       out.precipitation.push(Math.max(0, rain / 80 * u(0, 1.5)));
       out.precipitation_probability.push(clamp(rain + u(-10, 10), 0, 100));
@@ -615,14 +641,14 @@ function demoSeries(hill, days) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, flagKind: flagKind, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
+  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, summitWind: summitWind, flagKind: flagKind, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
 }
 </script>
 
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_PREFIX = "shp-v9-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
+  var CACHE_PREFIX = "shp-v10-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
@@ -732,7 +758,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Longer bars are better. Score = 45% views, 35% dryness, 20% calm. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Moderate rain is 5 mm or more in that window, heavy rain 15 mm or more. Moderate gusts are 25&ndash;29 mph, strong gusts 30 mph or more. Gusts of 40 mph or more cap the score.</p></div></details></li>';
+      '<p class="note">Longer bars are better. Score = 45% views, 35% dryness, 20% calm. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Moderate rain is 4 mm or more in that window, heavy rain 10 mm or more. Gusts use the higher of the gust forecast and the wind at summit height. Moderate gusts are 25&ndash;29 mph, strong gusts 30 mph or more. Gusts of 40 mph or more cap the score.</p></div></details></li>';
   }
 
   function render() {
