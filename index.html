@@ -457,11 +457,11 @@ var MODERATE_RAIN_MM = 4, HEAVY_RAIN_MM = 10; /* total mm in the walking window;
 var MODERATE_GUST_MPH = 25; /* strongest gust in the window; 30+ is "strong" */
 
 /* Chip colour for a flag. Any flag that starts with "moderate" is amber, so new
-   moderate flags pick up the colour automatically. Freezing level and murk are
+   moderate flags pick up the colour automatically. Freezing level and tops in cloud are
    blue info chips; everything else is a red warning. */
 function flagKind(f) {
   if (f.indexOf("moderate") === 0) return "mod";
-  if (f.indexOf("freezing") === 0 || f.indexOf("murky") === 0) return "info";
+  if (f.indexOf("freezing") === 0 || f.indexOf("tops likely in cloud") === 0) return "info";
   return "warn";
 }
 
@@ -526,7 +526,9 @@ function scoreDay(hours, summitM) {
   if (mm >= HEAVY_RAIN_MM) flags.push("heavy rain");
   else if (mm >= MODERATE_RAIN_MM) flags.push("moderate rain");
   if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
-  if (low >= 90) flags.push("murky and damp - tops likely in cloud");
+  /* Only when it isn't raining (under 0.5 mm, the point where the card switches to
+     "Rain"): on rainy days the rain text, picture and flags already say it's wet. */
+  if (low >= 90 && mm < 0.5) flags.push("tops likely in cloud");
 
   return {
     score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
@@ -648,7 +650,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_PREFIX = "shp-v10-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
+  var CACHE_PREFIX = "shp-v12-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
