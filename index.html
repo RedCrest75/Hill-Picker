@@ -444,11 +444,13 @@ var REGIONS = [
   ] }
 ];
 var HILLS = REGIONS[0].hills; /* Snowdonia: kept as the default area and for the tests */
-/* Pressure levels for wind at summit height: roughly 100 m, 500 m, 1,000 m and 1,500 m. */
-var LEVELS = [1000, 950, 900, 850];
+/* Pressure levels for wind and cloud at summit height: roughly 100 m, 300 m, 550 m,
+   750 m, 1,000 m and 1,500 m. */
+var LEVELS = [1000, 975, 950, 925, 900, 850];
 var HOURLY = ["apparent_temperature", "precipitation", "precipitation_probability",
   "cloud_cover_low", "cloud_cover_mid", "visibility", "wind_gusts_10m", "freezing_level_height"]
   .concat(LEVELS.map(function (l) { return "wind_speed_" + l + "hPa"; }),
+          LEVELS.map(function (l) { return "cloud_cover_" + l + "hPa"; }),
           LEVELS.map(function (l) { return "geopotential_height_" + l + "hPa"; }));
 var WIN_FROM = 9, WIN_TO = 16;
 /* Ranking: the clearest top comes first. The score is the Views score, less fixed steps for
@@ -485,17 +487,19 @@ function lerpScore(x, best, worst) {
   return Math.max(0, Math.min(1, t)) * 100;
 }
 
-/* Wind at the summit's height for one hour, interpolated between pressure levels using
-   their forecast heights. Null if the data is missing or the summit is below the lowest
-   level (very low places), in which case the ground-level gust is used on its own. */
-function summitWind(row, elev) {
+/* A value at the summit's height for one hour (prefix "wind_speed_" or "cloud_cover_"),
+   interpolated between pressure levels using their forecast heights. Null if the data is
+   missing. Below the lowest level (very low places) it's null too, unless useLowest is set,
+   in which case the lowest level's value is used. */
+function atSummit(row, elev, prefix, useLowest) {
   var pts = [];
   LEVELS.forEach(function (l) {
-    var z = row["geopotential_height_" + l + "hPa"], w = row["wind_speed_" + l + "hPa"];
+    var z = row["geopotential_height_" + l + "hPa"], w = row[prefix + l + "hPa"];
     if (z !== null && z !== undefined && w !== null && w !== undefined && !isNaN(z) && !isNaN(w)) pts.push([z, w]);
   });
   pts.sort(function (a, b) { return a[0] - b[0]; });
-  if (pts.length < 2 || elev < pts[0][0]) return null;
+  if (pts.length < 2) return null;
+  if (elev < pts[0][0]) return useLowest ? pts[0][1] : null;
   for (var i = 0; i < pts.length - 1; i++) {
     if (elev <= pts[i + 1][0]) {
       var f = (elev - pts[i][0]) / (pts[i + 1][0] - pts[i][0]);
@@ -504,6 +508,11 @@ function summitWind(row, elev) {
   }
   return pts[pts.length - 1][1];
 }
+/* Wind at summit height. Null below the lowest level: the ground-level gust is used alone. */
+function summitWind(row, elev) { return atSummit(row, elev, "wind_speed_", false); }
+/* Cloud at summit height: whether the top itself is in cloud. Open-Meteo works this out
+   from humidity at each level, so it's an estimate. */
+function summitCloud(row, elev) { return atSummit(row, elev, "cloud_cover_", true); }
 
 function scoreDay(hours, summitM) {
   var col = function (k) { return hours.map(function (h) { return h[k]; }); };
@@ -518,9 +527,14 @@ function scoreDay(hours, summitM) {
   var mm = clean(col("precipitation")).reduce(function (x, y) { return x + y; }, 0);
   var feels = vmin(col("apparent_temperature"), 5);
   var frz = vmin(col("freezing_level_height"), 9999);
+  /* Summit cloud: average cloud at the summit's height. If the level data is missing,
+     fall back to low cloud so the page still works. */
+  var top = mean(hours.map(function (h) { return summitCloud(h, summitM); }), low);
 
-  var cloudView = 100 - (0.8 * low + 0.2 * mid);
-  var view = 0.7 * cloudView + 0.3 * lerpScore(visKm, 20, 1);
+  /* Views: is the top clear (60%), how cloudy is the sky up to 3 km (20%), and how far
+     can you see (20%). */
+  var skyView = 100 - (0.8 * low + 0.2 * mid);
+  var view = 0.6 * (100 - top) + 0.2 * skyView + 0.2 * lerpScore(visKm, 20, 1);
   var wind = lerpScore(gust, 20, 50);
   var chanceWeight = 0.4 + 0.6 * Math.min(1, mm / 2); // chance counts 40% with no rain forecast, fully from 2 mm
   // Amount penalty keeps growing up to 15 mm, so 6 mm and 15 mm no longer score the same.
@@ -544,12 +558,12 @@ function scoreDay(hours, summitM) {
   if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
   /* Only when the card doesn't already call it rain: on rainy days the rain text,
      picture and flags already say it's wet. */
-  if (low >= 90 && !isRainy(pavg, mm)) flags.push("tops likely in cloud");
+  if (top >= 80 && !isRainy(pavg, mm)) flags.push("tops likely in cloud");
 
   return {
     score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
     rain: Math.round(rain),
-    cloud: Math.round(low), gust: Math.round(gust), rainChance: Math.round(pavg), rainMm: Math.round(mm * 10) / 10, feels: Math.round(feels),
+    top: Math.round(top), cloud: Math.round(low), visKm: Math.round(visKm), gust: Math.round(gust), rainChance: Math.round(pavg), rainMm: Math.round(mm * 10) / 10, feels: Math.round(feels),
     flags: flags
   };
 }
@@ -563,14 +577,14 @@ var SUN = '<circle class="s" cx="20" cy="20" r="7"/><path class="sr" d="M31 20h4
 var WX = {
   clear: { label: "Clear", svg: SUN },
   partly: { label: "Cloud and sun", svg: '<g transform="translate(3 -1) scale(.62)">' + SUN + "</g>" + CLOUD("c", 2) },
-  murky: { label: "Murky and damp", svg: CLOUD("c", -5) + '<path class="m" d="M8 30h24M11 34h22M8 38h16"/>' },
+  murky: { label: "Top in cloud", svg: CLOUD("c", -5) + '<path class="m" d="M8 30h24M11 34h22M8 38h16"/>' },
   rain: { label: "Rain", svg: CLOUD("cd", -5) + '<path class="d" d="M13 30l-2 5M21 30l-2 5M29 30l-2 5"/>' },
   windy: { label: "Very windy", svg: '<path class="w" d="M5 14h17a4 4 0 1 0-4-4M5 21h24a4 4 0 1 1-4 4M5 28h12a3.5 3.5 0 1 1-3.5 3.5"/>' }
 };
 /* Sky picture comes from the Views score (the same number the ranking uses), so among
    hills with the same warnings a clearer picture never sits below a cloudier one.
-   Views 70+ is roughly under half low cloud with good visibility; under 45 is about 90%
-   low cloud or murky air. */
+   Views 70+ is roughly a mostly clear top with good visibility; under 45 is a top
+   mostly in cloud or murky air. */
 var VIEW_CLEAR = 70, VIEW_PARTLY = 45;
 function weatherKind(h) {
   if (h.gust >= 40) return "windy";
@@ -668,20 +682,27 @@ function demoSeries(hill, days) {
       out.visibility.push(Math.max(500, 30000 - cloud * 250 - rain * 100 + u(-3000, 3000)));
       out.wind_gusts_10m.push(Math.max(0, wind * 1.25 + alt / 2 + u(-4, 4)));
       out.freezing_level_height.push(1400 - (10 - temp) * 120 + u(-50, 50));
+      /* Levels: rough heights, cloud thickening with height so higher tops are cloudier. */
+      [110, 320, 540, 760, 990, 1460].forEach(function (z, li) {
+        var l = LEVELS[li];
+        out["geopotential_height_" + l + "hPa"].push(z);
+        out["cloud_cover_" + l + "hPa"].push(clamp(cloud - 20 + (z - 500) / 12 + u(-10, 10), 0, 100));
+        out["wind_speed_" + l + "hPa"].push(wind * (0.7 + z / 2000));
+      });
     }
   }
   return out;
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, summitWind: summitWind, flagKind: flagKind, isRainy: isRainy, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
+  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, summitWind: summitWind, summitCloud: summitCloud, flagKind: flagKind, isRainy: isRainy, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
 }
 </script>
 
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_PREFIX = "shp-v13-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
+  var CACHE_PREFIX = "shp-v14-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
@@ -787,11 +808,12 @@ if (typeof module !== "undefined") {
       '<span class="rank">' + (i + 1) + "</span>" +
       '<span class="name"><b>' + esc(h.name) + "</b><i>" + h.metres + " m</i></span>" +
       wxHtml(h) + '<span class="score"><b>' + h.score + "</b><small>" + g[1] + "</small></span>" +
-      '<span class="stats"><span>Cloud ' + h.cloud + "%</span><span>Gusts " + h.gust + " mph</span><span>" + esc(rainText(h.rainChance, h.rainMm)) + "</span><span>Feels " + h.feels + "&deg;C</span></span>" +
+      '<span class="stats"><span>Summit cloud ' + h.top + "%</span><span>Gusts " + h.gust + " mph</span><span>" + esc(rainText(h.rainChance, h.rainMm)) + "</span><span>Feels " + h.feels + "&deg;C</span></span>" +
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Longer bars are better. The score is the Views score, so the clearest top ranks first. Strong gusts (30 mph or more) take off 10, rain (1 mm or more with a 40%+ chance, 09:00&ndash;16:00) takes off 10, and moderate rain (4 mm or more) takes off 20. Gusts of 40 mph or more cap the score at 45. Dryness and Calm show how wet and windy it is. Gusts use the higher of the gust forecast and the wind at summit height.</p></div></details></li>';
+      '<p class="note"><b>Summit cloud ' + h.top + "%</b> &middot; Sky cloud (up to 3 km) " + h.cloud + "% &middot; Visibility " + h.visKm + " km</p>" +
+      '<p class="note">Longer bars are better. Summit cloud is the forecast cloud at the summit&rsquo;s height, so low means a clear top even under a cloudy sky. Views = 60% summit cloud, 20% sky cloud, 20% visibility. The score is the Views score, so the clearest top ranks first. Strong gusts (30 mph or more) take off 10, rain (1 mm or more with a 40%+ chance, 09:00&ndash;16:00) takes off 10, and moderate rain (4 mm or more) takes off 20. Gusts of 40 mph or more cap the score at 45. Dryness and Calm show how wet and windy it is. Gusts use the higher of the gust forecast and the wind at summit height.</p></div></details></li>';
   }
 
   function render() {
