@@ -455,6 +455,13 @@ var WIN_FROM = 9, WIN_TO = 16;
 var W_VIEW = 0.45, W_RAIN = 0.35, W_WIND = 0.20;
 var MODERATE_RAIN_MM = 4, HEAVY_RAIN_MM = 10; /* total mm in the walking window; checked against MWIS and Mountain Forecast */
 var MODERATE_GUST_MPH = 25; /* strongest gust in the window; 30+ is "strong" */
+/* When the card calls it rain (rain picture and "Rain" wording): moderate rain or more on
+   its own, or at least 1 mm with a 40%+ chance. Trace amounts on a low chance show the
+   cloud picture instead, because clear tops are what the site is about. Scores are unaffected. */
+var RAIN_SHOW_MM = 1, RAIN_SHOW_CHANCE = 40;
+function isRainy(chance, mm) {
+  return mm >= MODERATE_RAIN_MM || (mm >= RAIN_SHOW_MM && chance >= RAIN_SHOW_CHANCE);
+}
 
 /* Chip colour for a flag. Any flag that starts with "moderate" is amber, so new
    moderate flags pick up the colour automatically. Freezing level and tops in cloud are
@@ -526,9 +533,9 @@ function scoreDay(hours, summitM) {
   if (mm >= HEAVY_RAIN_MM) flags.push("heavy rain");
   else if (mm >= MODERATE_RAIN_MM) flags.push("moderate rain");
   if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
-  /* Only when it isn't raining (under 0.5 mm, the point where the card switches to
-     "Rain"): on rainy days the rain text, picture and flags already say it's wet. */
-  if (low >= 90 && mm < 0.5) flags.push("tops likely in cloud");
+  /* Only when the card doesn't already call it rain: on rainy days the rain text,
+     picture and flags already say it's wet. */
+  if (low >= 90 && !isRainy(pavg, mm)) flags.push("tops likely in cloud");
 
   return {
     score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
@@ -553,7 +560,7 @@ var WX = {
 };
 function weatherKind(h) {
   if (h.gust >= 40) return "windy";
-  if (h.rainMm >= 0.5) return "rain";
+  if (isRainy(h.rainChance, h.rainMm)) return "rain";
   if (h.cloud >= 90) return "murky";
   if (h.cloud >= 50) return "partly";
   return "clear";
@@ -563,11 +570,13 @@ function wxHtml(h) {
   return '<span class="wx" role="img" aria-label="' + w.label + '" title="' + w.label + '"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">' + w.svg + "</svg></span>";
 }
 
-/* Plain-English rain wording for the card. Under 0.5 mm in the window, a high chance
-   means damp air and hill cloud rather than rain. */
+/* Plain-English rain wording for the card, matching the picture: "Rain" only when
+   isRainy says so. Otherwise a high chance means damp air and hill cloud, and 1 mm+
+   on a low chance means a passing shower is possible. */
 function rainText(chance, mm) {
-  if (mm >= 0.5) return "Rain " + chance + "%, " + mm.toFixed(1) + " mm";
+  if (isRainy(chance, mm)) return "Rain " + chance + "%, " + mm.toFixed(1) + " mm";
   if (chance >= 50) return mm < 0.1 ? "Damp, no rain forecast" : "Damp, " + mm.toFixed(1) + " mm";
+  if (mm >= RAIN_SHOW_MM) return "Showers possible, " + mm.toFixed(1) + " mm";
   return mm < 0.1 ? "Dry" : "Mostly dry, " + mm.toFixed(1) + " mm";
 }
 
@@ -643,7 +652,7 @@ function demoSeries(hill, days) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, summitWind: summitWind, flagKind: flagKind, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
+  module.exports = { HILLS: HILLS, HOURLY: HOURLY, scoreDay: scoreDay, summitWind: summitWind, flagKind: flagKind, isRainy: isRainy, rainText: rainText, weatherKind: weatherKind, wxHtml: wxHtml, windowByDay: windowByDay, buildResults: buildResults, demoSeries: demoSeries };
 }
 </script>
 
