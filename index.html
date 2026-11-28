@@ -540,6 +540,16 @@ function scoreDay(hours, summitM) {
   // Amount penalty keeps growing up to 15 mm, so 6 mm and 15 mm no longer score the same.
   var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg * chanceWeight - Math.min(mm * 4, 60)));
 
+  /* Every rule below uses the numbers exactly as the card shows them (gusts in whole mph,
+     rain to 0.1 mm, chance and cloud in whole %, freezing level to 10 m), so the label,
+     chip, icon, penalty and wording can never disagree. The scores themselves are still
+     worked out from the unrounded forecast. */
+  gust = Math.round(gust);
+  mm = Math.round(mm * 10) / 10;
+  pavg = Math.round(pavg);
+  top = Math.round(top);
+  frz = Math.round(frz / 10) * 10;
+
   /* Dryness and Calm are still worked out for the detail bars, but only the warning
      level moves the ranking. */
   var total = view;
@@ -555,7 +565,7 @@ function scoreDay(hours, summitM) {
   else if (gust >= MODERATE_GUST_MPH) { flags.push("moderate gusts"); }
   if (mm >= HEAVY_RAIN_MM) flags.push("heavy rain");
   else if (mm >= MODERATE_RAIN_MM) flags.push("moderate rain");
-  if (frz < summitM) flags.push("freezing level " + (Math.round(frz / 10) * 10) + "m - ice/snow likely up top");
+  if (frz < summitM) flags.push("freezing level " + frz + "m - ice/snow likely up top");
   /* Only when the card doesn't already call it rain: on rainy days the rain text,
      picture and flags already say it's wet. */
   if (top >= 80 && !isRainy(pavg, mm)) flags.push("tops likely in cloud");
@@ -563,7 +573,7 @@ function scoreDay(hours, summitM) {
   return {
     score: Math.round(total), view: Math.round(view), wind: Math.round(wind),
     rain: Math.round(rain),
-    top: Math.round(top), cloud: Math.round(low), visKm: Math.round(visKm), gust: Math.round(gust), rainChance: Math.round(pavg), rainMm: Math.round(mm * 10) / 10, feels: Math.round(feels),
+    top: top, cloud: Math.round(low), visKm: Math.round(visKm), gust: gust, rainChance: pavg, rainMm: mm, feels: Math.round(feels),
     flags: flags
   };
 }
@@ -630,6 +640,12 @@ function windowByDay(hourly) {
   return days;
 }
 
+/* Highest score first. On a tie, the clearer top (lower summit cloud) wins, then the
+   higher Views score. */
+function byRank(a, b) {
+  return (b.score - a.score) || (a.top - b.top) || (b.view - a.view);
+}
+
 function buildResults(seriesList, hills) {
   hills = hills || HILLS;
   var byDate = {};
@@ -642,7 +658,7 @@ function buildResults(seriesList, hills) {
     });
   });
   return Object.keys(byDate).sort().map(function (date) {
-    return { date: date, hills: byDate[date].sort(function (a, b) { return b.score - a.score; }) };
+    return { date: date, hills: byDate[date].sort(byRank) };
   });
 }
 
@@ -702,7 +718,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_PREFIX = "shp-v14-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
+  var CACHE_PREFIX = "shp-v15-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
