@@ -451,13 +451,16 @@ var HOURLY = ["apparent_temperature", "precipitation", "precipitation_probabilit
   .concat(LEVELS.map(function (l) { return "wind_speed_" + l + "hPa"; }),
           LEVELS.map(function (l) { return "geopotential_height_" + l + "hPa"; }));
 var WIN_FROM = 9, WIN_TO = 16;
-/* Score weights: clear tops first, then dryness, then wind. Dangerous gusts still cap the score. */
-var W_VIEW = 0.45, W_RAIN = 0.35, W_WIND = 0.20;
+/* Ranking: the clearest top comes first. The score is the Views score, less fixed steps for
+   wind and rain warnings, so hills with the same warnings rank purely by clearness and a
+   hill only drops below a clearer one when its warning is worse. Dangerous gusts still cap it. */
+var PEN_STRONG_GUST = 10, PEN_RAIN = 10, PEN_MODERATE_RAIN = 20;
 var MODERATE_RAIN_MM = 4, HEAVY_RAIN_MM = 10; /* total mm in the walking window; checked against MWIS and Mountain Forecast */
-var MODERATE_GUST_MPH = 25; /* strongest gust in the window; 30+ is "strong" */
+var MODERATE_GUST_MPH = 25, STRONG_GUST_MPH = 30; /* strongest gust in the window */
 /* When the card calls it rain (rain picture and "Rain" wording): moderate rain or more on
    its own, or at least 1 mm with a 40%+ chance. Trace amounts on a low chance show the
-   cloud picture instead, because clear tops are what the site is about. Scores are unaffected. */
+   cloud picture instead, because clear tops are what the site is about. The same rule
+   decides the rain step in the score. */
 var RAIN_SHOW_MM = 1, RAIN_SHOW_CHANCE = 40;
 function isRainy(chance, mm) {
   return mm >= MODERATE_RAIN_MM || (mm >= RAIN_SHOW_MM && chance >= RAIN_SHOW_CHANCE);
@@ -523,7 +526,13 @@ function scoreDay(hours, summitM) {
   // Amount penalty keeps growing up to 15 mm, so 6 mm and 15 mm no longer score the same.
   var rain = Math.max(0, Math.min(100, 100 - 0.5 * pavg * chanceWeight - Math.min(mm * 4, 60)));
 
-  var total = W_VIEW * view + W_RAIN * rain + W_WIND * wind;
+  /* Dryness and Calm are still worked out for the detail bars, but only the warning
+     level moves the ranking. */
+  var total = view;
+  if (gust >= STRONG_GUST_MPH) total -= PEN_STRONG_GUST;
+  if (mm >= MODERATE_RAIN_MM) total -= PEN_MODERATE_RAIN;
+  else if (isRainy(pavg, mm)) total -= PEN_RAIN;
+  total = Math.max(0, total);
 
   var flags = [];
   if (gust >= 55) { total = Math.min(total, 15); flags.push("dangerous gusts"); }
@@ -558,16 +567,29 @@ var WX = {
   rain: { label: "Rain", svg: CLOUD("cd", -5) + '<path class="d" d="M13 30l-2 5M21 30l-2 5M29 30l-2 5"/>' },
   windy: { label: "Very windy", svg: '<path class="w" d="M5 14h17a4 4 0 1 0-4-4M5 21h24a4 4 0 1 1-4 4M5 28h12a3.5 3.5 0 1 1-3.5 3.5"/>' }
 };
+/* Sky picture comes from the Views score (the same number the ranking uses), so among
+   hills with the same warnings a clearer picture never sits below a cloudier one.
+   Views 70+ is roughly under half low cloud with good visibility; under 45 is about 90%
+   low cloud or murky air. */
+var VIEW_CLEAR = 70, VIEW_PARTLY = 45;
 function weatherKind(h) {
   if (h.gust >= 40) return "windy";
   if (isRainy(h.rainChance, h.rainMm)) return "rain";
-  if (h.cloud >= 90) return "murky";
-  if (h.cloud >= 50) return "partly";
-  return "clear";
+  if (h.view >= VIEW_CLEAR) return "clear";
+  if (h.view >= VIEW_PARTLY) return "partly";
+  return "murky";
 }
+/* Strong gusts (30-39 mph) cost 10 points, so the picture shows them: the sky picture
+   shrinks to the top left and gust curls sit in the bottom right. 40+ already gets the
+   full "Very windy" picture. */
+var GUST = '<path class="w" d="M18 29h13a3 3 0 1 0-3-3M14 34.5h16a2.5 2.5 0 1 1-2.5 2.5"/>';
 function wxHtml(h) {
-  var w = WX[weatherKind(h)];
-  return '<span class="wx" role="img" aria-label="' + w.label + '" title="' + w.label + '"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">' + w.svg + "</svg></span>";
+  var kind = weatherKind(h), w = WX[kind], svg = w.svg, label = w.label;
+  if (kind !== "windy" && h.gust >= STRONG_GUST_MPH) {
+    svg = '<g transform="translate(-1 -4) scale(.75)">' + svg + "</g>" + GUST;
+    label += ", strong gusts";
+  }
+  return '<span class="wx" role="img" aria-label="' + label + '" title="' + label + '"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">' + svg + "</svg></span>";
 }
 
 /* Plain-English rain wording for the card, matching the picture: "Rain" only when
@@ -659,7 +681,7 @@ if (typeof module !== "undefined") {
 <script id="ui">
 (function () {
   var API = "https://api.open-meteo.com/v1/forecast";
-  var CACHE_PREFIX = "shp-v12-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
+  var CACHE_PREFIX = "shp-v13-", CACHE_MIN = 60, DAYS = 4, TOP = 10, AREA_KEY = "shp-area";
   var $ = function (s) { return document.querySelector(s); };
   var data = null, sel = 0, showAll = false, failed = null, token = 0;
   var demo = location.hash === "#demo";
@@ -769,7 +791,7 @@ if (typeof module !== "undefined") {
       (chips ? '<span class="chips">' + chips + "</span>" : "") +
       '<span class="bar"><span style="width:' + h.score + '%"></span></span>' +
       '</summary><div class="more">' + rows +
-      '<p class="note">Longer bars are better. Score = 45% views, 35% dryness, 20% calm. Dryness counts the total rainfall, 09:00&ndash;16:00, plus the average chance, which counts less when little rain is forecast. Moderate rain is 4 mm or more in that window, heavy rain 10 mm or more. Gusts use the higher of the gust forecast and the wind at summit height. Moderate gusts are 25&ndash;29 mph, strong gusts 30 mph or more. Gusts of 40 mph or more cap the score.</p></div></details></li>';
+      '<p class="note">Longer bars are better. The score is the Views score, so the clearest top ranks first. Strong gusts (30 mph or more) take off 10, rain (1 mm or more with a 40%+ chance, 09:00&ndash;16:00) takes off 10, and moderate rain (4 mm or more) takes off 20. Gusts of 40 mph or more cap the score at 45. Dryness and Calm show how wet and windy it is. Gusts use the higher of the gust forecast and the wind at summit height.</p></div></details></li>';
   }
 
   function render() {
